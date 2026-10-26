@@ -10,7 +10,14 @@ export default [
 
   {
     name: 'app/files-to-ignore',
-    ignores: ['**/dist/**', '**/dist-ssr/**', '**/coverage/**', "src/plugins/jump.js"],
+    ignores: [
+      '**/dist/**',
+      '**/dist-ssr/**',
+      '**/coverage/**',
+      '**/src-tauri/target/**',
+      '**/src-tauri/gen/**',
+      'src/plugins/jump.js',
+    ],
   },
 
   ...pluginVue.configs['flat/essential'],

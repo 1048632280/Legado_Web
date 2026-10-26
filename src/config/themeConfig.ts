@@ -55,11 +55,11 @@ const settings = {
     },
   ],
   fonts: [
-    'Microsoft YaHei, PingFangSC-Regular, HelveticaNeue-Light, Helvetica Neue Light, sans-serif',
-
-    'PingFangSC-Regular, -apple-system, Simsun',
-
-    'Kaiti',
+    'SimSun, 宋体, serif',
+    'SimHei, 黑体, sans-serif',
+    'KaiTi, 楷体, serif',
+    'PingFang SC, 苹方, sans-serif',
+    'Microsoft YaHei, 微软雅黑, sans-serif',
   ],
 }
 export default settings

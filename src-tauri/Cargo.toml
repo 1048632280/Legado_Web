@@ -1,0 +1,16 @@
+[package]
+name = "legado-local-reader"
+version = "1.0.0"
+description = "Legado 本地 TXT 阅读器"
+authors = ["Legado Web"]
+edition = "2021"
+rust-version = "1.77.2"
+build = "build.rs"
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "=2.11.3", features = [] }

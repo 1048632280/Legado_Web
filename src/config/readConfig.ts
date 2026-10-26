@@ -3,11 +3,10 @@ import settings from './themeConfig'
 
 export const DEFAULT_READ_CONFIG: webReadConfig = {
   theme: 0,
-  font: 0,
+  font: 4,
   fontSize: 18,
   readWidth: 800,
   infiniteLoading: false,
-  customFontName: '',
   jumpDuration: 1000,
   spacing: {
     paragraph: 1,
@@ -56,7 +55,7 @@ export const normalizeReadConfig = (value: unknown): webReadConfig => {
   const theme = integerInRange(value.theme, 0, settings.themes.length - 1)
   if (theme !== undefined) config.theme = theme
 
-  const font = integerInRange(value.font, -1, settings.fonts.length - 1)
+  const font = integerInRange(value.font, 0, settings.fonts.length - 1)
   if (font !== undefined) config.font = font
 
   const fontSize = integerInRange(value.fontSize, 12, 48)
@@ -70,9 +69,6 @@ export const normalizeReadConfig = (value: unknown): webReadConfig => {
 
   if (typeof value.infiniteLoading === 'boolean') {
     config.infiniteLoading = value.infiniteLoading
-  }
-  if (typeof value.customFontName === 'string') {
-    config.customFontName = value.customFontName
   }
 
   if (isRecord(value.spacing)) {

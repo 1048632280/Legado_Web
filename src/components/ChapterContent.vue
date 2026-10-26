@@ -1,111 +1,34 @@
 <template>
-  <div class="title" data-chapterpos="0" ref="titleRef">{{ title }}</div>
-  <div
-    v-for="(para, index) in contents"
+  <div ref="titleRef" class="title" data-chapterpos="0">{{ title }}</div>
+  <p
+    v-for="(paragraph, index) in contents"
     :key="index"
     ref="paragraphRef"
     :data-chapterpos="chapterPos[index]"
+    :style="{ fontFamily, fontSize }"
   >
-    <img
-      class="full"
-      v-if="isSingleImageContent(para)"
-      :src="getImageSrc(para)"
-      @error.once="proxyImage"
-      loading="lazy"
-    />
-    <p
-      v-else
-      :style="{ fontFamily, fontSize }"
-      v-html="replaceImage(para)"
-      @error.capture="handleImgLoadError"
-    />
-  </div>
+    {{ paragraph }}
+  </p>
 </template>
 
 <script setup lang="ts">
-import { isLegadoUrl } from '@/utils/utils'
-import API from '@api'
 import jump from '@/plugins/jump'
 import type { webReadConfig } from '@/web'
 
-const store = useBookStore()
-const readWidth = computed(() => store.config.readWidth)
-const _fontSize = computed(() => store.config.fontSize)
-const bookUrl = computed(() => store.readingBook.bookUrl)
-
 const props = defineProps<{
   chapterIndex: number
-  contents: Array<string>
+  contents: string[]
   title: string
   spacing: webReadConfig['spacing']
   fontFamily: string
   fontSize: string
 }>()
 
-const imgPattern = /<img\b[^>]*\bsrc\s*=\s*(['"])(.*?)\1[^>]*>/gi
-const singleImgPattern = /^\s*<img\b[^>]*\bsrc\s*=\s*(['"])(.*?)\1[^>]*>\s*$/i
-
-const extractSingleImageSrc = (content: string) =>
-  content.match(singleImgPattern)?.[2]
-const isSingleImageContent = (content: string) =>
-  extractSingleImageSrc(content) !== undefined
-
-const replaceImage = (content: string) => {
-  return content.replace(imgPattern, (match, quote: string, src: string) => {
-    void quote
-    if (isLegadoUrl(src)) {
-      const proxySrc = API.getProxyImageUrl(
-        bookUrl.value,
-        src,
-        _fontSize.value * 2,
-      )
-      return match.replace(src, proxySrc)
-    }
-    return match
-  })
-}
-
-const getImageSrc = (content: string) => {
-  const src = extractSingleImageSrc(content)
-  if (src === undefined) return ''
-  if (isLegadoUrl(src)) {
-    return API.getProxyImageUrl(bookUrl.value, src, readWidth.value)
-  }
-  return src
-}
-const proxyImage = (event: Event) => {
-  /* 获取 IMG 标签原始的 src
-    <img src="/test" />
-    假设 location.href = http://example.com
-    event.target.src 返回 http://example.com/test
-    target.getAttribute('src') 返回 /test
-  */
-  const target = event.target as HTMLImageElement
-  const src = target.getAttribute('src')
-  if (src !== null && src.length > 0) {
-    target.src = API.getProxyImageUrl(bookUrl.value, src, readWidth.value)
-  }
-}
-
-/**
- * 处理传入的IMG标签错误事件，自动替换图片的代理链接
- */
-const handleImgLoadError = (event: Event) => {
-  if ((event.target as HTMLElement)?.tagName === 'IMG') {
-    proxyImage(event)
-  }
-}
-
-const calculateWordCount = (paragraph: string) => {
-  //内嵌图片文字为1
-  const imagePlaceHolder = ' '
-  return paragraph.replace(imgPattern, imagePlaceHolder).length
-}
 const chapterPos = computed(() => {
-  let pos = -1
-  return Array.from(props.contents, content => {
-    pos += calculateWordCount(content) + 1 //计算上一段的换行符
-    return pos
+  let position = -1
+  return props.contents.map(content => {
+    position += content.length + 1
+    return position
   })
 })
 
@@ -113,48 +36,53 @@ const titleRef = ref<HTMLElement>()
 const paragraphRef = ref<HTMLParagraphElement[]>()
 const scrollToReadLength = (length: number) => {
   if (length === 0) return
-  const paragraphIndex = chapterPos.value.findIndex(
-    wordCount => wordCount >= length,
-  )
-  if (paragraphIndex === -1) return
-  nextTick(() => {
-    jump(paragraphRef.value![paragraphIndex], {
-      duration: 0,
-    })
-  })
+  const index = chapterPos.value.findIndex(position => position >= length)
+  if (index === -1) return
+  const paragraph = paragraphRef.value?.[index]
+  if (paragraph === undefined) return
+  nextTick(() => jump(paragraph, { duration: 0 }))
 }
-defineExpose({
-  scrollToReadLength,
-})
-let intersectionObserver: IntersectionObserver | null = null
-const emit = defineEmits(['readLengthChange'])
-onMounted(() => {
-  intersectionObserver = new IntersectionObserver(
+defineExpose({ scrollToReadLength })
+
+const emit = defineEmits<{
+  readLengthChange: [index: number, position: number]
+}>()
+let observer: IntersectionObserver | undefined
+
+const observeReadingProgress = () => {
+  observer?.disconnect()
+  observer = new IntersectionObserver(
     entries => {
-      for (const { target, isIntersecting } of entries) {
+      entries.forEach(({ target, isIntersecting }) => {
         if (isIntersecting) {
           emit(
             'readLengthChange',
             props.chapterIndex,
-            parseInt((target as HTMLElement).dataset.chapterpos as string),
+            Number((target as HTMLElement).dataset.chapterpos ?? 0),
           )
         }
-      }
+      })
     },
-    {
-      rootMargin: `0px 0px -${window.innerHeight - 24}px 0px`,
-    },
+    { rootMargin: `0px 0px -${window.innerHeight - 24}px 0px` },
   )
-  intersectionObserver.observe(titleRef.value!)
-  paragraphRef.value!.forEach(element => {
-    intersectionObserver!.observe(element)
-  })
+  if (titleRef.value === undefined) return
+  observer.observe(titleRef.value)
+  paragraphRef.value?.forEach(paragraph => observer?.observe(paragraph))
+}
+
+onMounted(() => {
+  observeReadingProgress()
 })
 
-onUnmounted(() => {
-  intersectionObserver?.disconnect()
-  intersectionObserver = null
-})
+watch(
+  () => props.contents,
+  () => {
+    void nextTick(observeReadingProgress)
+  },
+  { flush: 'post' },
+)
+
+onUnmounted(() => observer?.disconnect())
 </script>
 
 <style lang="scss" scoped>
@@ -170,19 +98,10 @@ onUnmounted(() => {
 
 p {
   display: block;
-  word-wrap: break-word;
-  /*   word-break: break-all; */
+  margin: calc(v-bind('props.spacing.paragraph') * 1em) 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
   letter-spacing: calc(v-bind('props.spacing.letter') * 1em);
   line-height: calc(1 + v-bind('props.spacing.line'));
-  margin: calc(v-bind('props.spacing.paragraph') * 1em) 0;
-
-  :deep(img) {
-    height: 1em;
-  }
-}
-
-.full {
-  display: block;
-  width: 100%;
 }
 </style>

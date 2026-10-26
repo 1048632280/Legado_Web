@@ -5,8 +5,6 @@ import type {
   Book,
   BookChapter,
   BookProgress,
-  SourceBookImportResult,
-  SourceSearchBook,
 } from '@/book'
 import type { webReadConfig } from '@/web'
 import {
@@ -27,7 +25,6 @@ export const useBookStore = defineStore('book', {
       readingBook: { chapterPos: 0, chapterIndex: 0 } as BaseBook & {
         chapterPos: number
         chapterIndex: number
-        isSearchBook?: boolean
       },
       popCataVisible: false,
       showContent: false,
@@ -100,18 +97,6 @@ export const useBookStore = defineStore('book', {
         return this.shelf
       }
       return this.refreshBookShelf()
-    },
-    /** 将书源搜索结果加入书架，并刷新书架缓存 */
-    async importSourceBook(
-      book: SourceSearchBook,
-    ): Promise<SourceBookImportResult> {
-      const resp = await API.importSourceBook(book)
-      const { isSuccess, data, errorMsg } = resp.data
-      if (!isSuccess) {
-        throw new Error(errorMsg || '书源搜索结果加入书架失败')
-      }
-      await this.refreshBookShelf()
-      return data
     },
     /** 从本地数据源加载书籍目录，优先返回内存缓存 */
     async loadWebCatalog(

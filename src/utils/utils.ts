@@ -4,14 +4,6 @@ export const isNullOrBlank = (string: string | null | undefined | number) =>
   string === undefined ||
   (typeof string === 'string' && string.trim().length === 0)
 
-export const isLegadoUrl = (/** @type {string} */ url: string) =>
-  /,\s*\{/.test(url) ||
-  !(
-    url.startsWith('http') ||
-    url.startsWith('data:') ||
-    url.startsWith('blob:')
-  )
-
 export const dateFormat = (/** @type {number} */ t: number) => {
   const time = Date.now()
   const offset = Math.floor((time - t) / 1000)

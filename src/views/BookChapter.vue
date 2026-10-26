@@ -39,6 +39,30 @@
             </div>
           </template>
         </el-popover>
+        <el-popover
+          placement="right"
+          :width="popupWidth"
+          trigger="click"
+          :show-arrow="false"
+          v-model:visible="contentFilterVisible"
+          popper-class="pop-filter"
+        >
+          <content-filter-panel
+            class="popup"
+            :is-night="isNight"
+            :rules="contentFilterRules"
+            :is-loading="contentFilterLoading"
+            :is-saving="contentFilterSaving"
+            @add-rule="addContentFilterRule"
+            @delete-rule="deleteContentFilterRule"
+          />
+          <template #reference>
+            <div class="tool-icon" :class="{ 'no-point': noPoint }">
+              <el-icon class="filter-icon"><Filter /></el-icon>
+              <div class="icon-text">过滤</div>
+            </div>
+          </template>
+        </el-popover>
         <div class="tool-icon" @click="toShelf">
           <div class="iconfont">&#58892;</div>
           <div class="icon-text">书架</div>
@@ -82,7 +106,7 @@
       <div class="content">
         <div class="top-bar" ref="top"></div>
         <div
-          v-for="data in chapterData"
+          v-for="data in renderedChapterData"
           :key="data.index"
           :chapterIndex="data.index"
         >
@@ -109,9 +133,13 @@
 import jump from '@/plugins/jump'
 import settings from '@/config/themeConfig'
 import API from '@api'
+import ContentFilterPanel from '@/components/ContentFilterPanel.vue'
 import { useLoading } from '@/hooks/loading'
+import { useContentFilters } from '@/hooks/useContentFilters'
 import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
+import { applyContentFilters } from '@/utils/contentFilter'
+import { Filter } from '@element-plus/icons-vue'
 
 const content = ref()
 // loading spinner
@@ -138,14 +166,39 @@ const chapterIndex = computed({
   set: value => (store.readingBook.chapterIndex = value),
 })
 
+const contentFilterVisible = ref(false)
+const contentFilterBookUrl = ref('')
+const {
+  rules: contentFilterRules,
+  isLoading: contentFilterLoading,
+  isSaving: contentFilterSaving,
+  errorMessage: contentFilterErrorMessage,
+  addRule: addContentFilter,
+  deleteRule: deleteContentFilter,
+} = useContentFilters(contentFilterBookUrl)
+
+const addContentFilterRule = async (search: string, replacement: string) => {
+  if (await addContentFilter(search, replacement)) return
+  ElMessage.error(contentFilterErrorMessage.value || '添加过滤规则失败')
+}
+
+const deleteContentFilterRule = async (id: string) => {
+  if (await deleteContentFilter(id)) return
+  ElMessage.error(contentFilterErrorMessage.value || '删除过滤规则失败')
+}
+
 // 当前阅读书籍readingBook持久化
 watch(
   () => store.readingBook,
   book => {
-    // 保存localStorage
-    // localStorage.setItem(book.bookUrl, JSON.stringify(book));
-    // 最近阅读
-    localStorage.setItem('readingRecent', JSON.stringify(book))
+    if (!book.bookUrl) return
+    void API.saveReadingRecent({
+      name: book.name ?? '',
+      author: book.author ?? '',
+      bookUrl: book.bookUrl,
+      chapterIndex: book.chapterIndex,
+      chapterPos: book.chapterPos,
+    })
     //保存 sessionStorage
     sessionStorage.setItem('chapterIndex', book.chapterIndex.toString())
     sessionStorage.setItem('chapterPos', book.chapterPos.toString())
@@ -184,10 +237,7 @@ const onReachBottom = (entries: IntersectionObserverEntry[]) => {
 
 // 字体
 const fontFamily = computed(() => {
-  if (store.config.font >= 0) {
-    return settings.fonts[store.config.font]
-  }
-  return store.config.customFontName
+  return settings.fonts[store.config.font]
 })
 const fontSize = computed(() => {
   return store.config.fontSize + 'px'
@@ -287,8 +337,17 @@ const scheduleToShelf = () => {
 }
 
 // 获取章节内容
-type ChapterRenderData = { index: number; content: string[]; title: string }
+type ChapterRenderData = { index: number; rawContent: string; title: string }
 const chapterData = ref<ChapterRenderData[]>([])
+const renderedChapterData = computed(() =>
+  chapterData.value.map(data => ({
+    index: data.index,
+    content: applyContentFilters(data.rawContent, contentFilterRules.value).split(
+      /\n+/,
+    ),
+    title: data.title,
+  })),
+)
 let activeContentRequestId = 0
 let disposed = false
 const noPoint = ref(true)
@@ -346,7 +405,7 @@ const renderChapterError = (
 ) => {
   const errorMessage = message || '获取章节内容失败'
   ElMessage({ message: errorMessage, type: 'error' })
-  writeChapterData({ index, content: [errorMessage], title }, false, 0)
+  writeChapterData({ index, rawContent: errorMessage, title }, false, 0)
 }
 const loadChapterContent = async (
   requestBookUrl: string,
@@ -369,7 +428,7 @@ const loadChapterContent = async (
     writeChapterData(
       {
         index: displayIndex,
-        content: res.data.data.split(/\n+/),
+        rawContent: res.data.data,
         title,
       },
       reloadChapter,
@@ -458,7 +517,6 @@ const saveReadingBookProgressToBrowser = (index: number, pos: number) => {
 // 返回导航变化 同步请求会在获取书架前完成
 
 /**
- * VisibilityChange https://developer.mozilla.org/zh-CN/docs/Web/API/Document/visibilitychange_event
  * 监听关闭页面 切换tab 返回桌面 等操作
  * 注意不用监听点击链接导航变化 不对Safari<14.5兼容处理
  **/
@@ -572,9 +630,6 @@ onMounted(async () => {
   const initialChapterPos = normalizeReadingNumber(
     sessionStorage.getItem('chapterPos'),
   )
-  const isSearchBook =
-    sessionStorage.getItem('isSearchBook') === 'true' ||
-    sessionStorage.getItem('isSeachBook') === 'true'
   if (isNullOrBlank(bookUrl) || isNullOrBlank(name)) {
     ElMessage.warning('书籍信息为空，即将自动返回书架页面...')
     scheduleToShelf()
@@ -586,9 +641,9 @@ onMounted(async () => {
     author,
     chapterIndex: initialChapterIndex,
     chapterPos: initialChapterPos,
-    isSearchBook,
   }
   store.prepareReadingBook(book)
+  contentFilterBookUrl.value = book.bookUrl
   onResize()
   window.addEventListener('resize', onResize)
   const isActiveOpen = () =>
@@ -647,6 +702,8 @@ onUnmounted(() => {
   scrollObserver?.disconnect()
   scrollObserver = null
   jump.cancel()
+  contentFilterVisible.value = false
+  contentFilterBookUrl.value = ''
   if (toShelfTimer !== undefined) clearTimeout(toShelfTimer)
 })
 
@@ -665,6 +722,11 @@ onBeforeRouteLeave((to, from, next) => {
 
 :deep(.pop-cata) {
   margin-left: 10px;
+}
+
+:deep(.pop-filter) {
+  margin-left: 68px;
+  top: 0;
 }
 
 .chapter-wrapper {
@@ -701,6 +763,14 @@ onBeforeRouteLeave((to, from, next) => {
           height: 16px;
           font-size: 16px;
           margin: 0 auto 6px;
+        }
+
+        .filter-icon {
+          display: block;
+          width: 16px;
+          height: 16px;
+          margin: 0 auto 6px;
+          font-size: 16px;
         }
 
         .icon-text {

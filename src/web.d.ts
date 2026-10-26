@@ -4,7 +4,6 @@ export type webReadConfig = {
   fontSize: number
   readWidth: number
   infiniteLoading: boolean
-  customFontName: string
   jumpDuration: number
   spacing: {
     paragraph: number

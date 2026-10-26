@@ -1,4 +1,4 @@
-import serverApi, { getApiTargetName, subscribeApiAvailability } from './server'
+import standaloneApi from './standalone'
 
 export type LegadoApiResponse<T> = {
   isSuccess: boolean
@@ -7,6 +7,4 @@ export type LegadoApiResponse<T> = {
   data: T
 }
 
-export { getApiTargetName, subscribeApiAvailability }
-
-export default serverApi
+export default standaloneApi

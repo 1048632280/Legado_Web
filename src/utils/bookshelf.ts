@@ -1,6 +1,7 @@
 import type { Book } from '@/book'
 
-export { getErrorMessage } from './jsonFile'
+export const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)
 
 export type ReadingRecentBook = {
   name: string
@@ -8,18 +9,14 @@ export type ReadingRecentBook = {
   bookUrl: string
   chapterIndex: number
   chapterPos: number
-  isSearchBook?: boolean
 }
 
-const READING_RECENT_STORAGE_KEY = 'readingRecent'
 const READING_SESSION_KEYS = [
   'bookUrl',
   'bookName',
   'bookAuthor',
   'chapterIndex',
   'chapterPos',
-  'isSearchBook',
-  'isSeachBook',
 ]
 
 export const createDefaultReadingRecent = (): ReadingRecentBook => ({
@@ -28,61 +25,7 @@ export const createDefaultReadingRecent = (): ReadingRecentBook => ({
   bookUrl: '',
   chapterIndex: 0,
   chapterPos: 0,
-  isSearchBook: false,
 })
-
-const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
-
-const parseStoredReadingRecent = (
-  raw: string,
-): ReadingRecentBook | undefined => {
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    if (!isObjectRecord(parsed)) return undefined
-    if (
-      typeof parsed.name !== 'string' ||
-      typeof parsed.author !== 'string' ||
-      typeof parsed.bookUrl !== 'string'
-    ) {
-      return undefined
-    }
-
-    return {
-      name: parsed.name,
-      author: parsed.author,
-      bookUrl: parsed.bookUrl,
-      chapterIndex:
-        typeof parsed.chapterIndex === 'number' ? parsed.chapterIndex : 0,
-      chapterPos: typeof parsed.chapterPos === 'number' ? parsed.chapterPos : 0,
-      isSearchBook:
-        typeof parsed.isSearchBook === 'boolean'
-          ? parsed.isSearchBook
-          : parsed.isSeachBook === true,
-    }
-  } catch {
-    return undefined
-  }
-}
-
-export const loadStoredReadingRecent = (): ReadingRecentBook | undefined => {
-  const raw = localStorage.getItem(READING_RECENT_STORAGE_KEY)
-  if (raw === null) return undefined
-
-  const recent = parseStoredReadingRecent(raw)
-  if (recent !== undefined) return recent
-
-  localStorage.removeItem(READING_RECENT_STORAGE_KEY)
-  return createDefaultReadingRecent()
-}
-
-export const saveReadingRecent = (recent: ReadingRecentBook) => {
-  localStorage.setItem(READING_RECENT_STORAGE_KEY, JSON.stringify(recent))
-}
-
-export const clearStoredReadingRecent = () => {
-  localStorage.removeItem(READING_RECENT_STORAGE_KEY)
-}
 
 export const saveReadingSession = (recent: ReadingRecentBook) => {
   sessionStorage.setItem('bookUrl', recent.bookUrl)
@@ -90,8 +33,6 @@ export const saveReadingSession = (recent: ReadingRecentBook) => {
   sessionStorage.setItem('bookAuthor', recent.author)
   sessionStorage.setItem('chapterIndex', String(recent.chapterIndex))
   sessionStorage.setItem('chapterPos', String(recent.chapterPos))
-  sessionStorage.setItem('isSearchBook', String(recent.isSearchBook))
-  sessionStorage.removeItem('isSeachBook')
 }
 
 export const clearReadingSession = () => {
@@ -120,7 +61,7 @@ export const getBookReadPosition = (book: Book) => ({
   chapterPos: book.durChapterPos,
 })
 
-export const isTextFile = (file: File) =>
+export const isTextFile = (file: { name: string; type?: string }) =>
   file.name.toLocaleLowerCase().endsWith('.txt') || file.type === 'text/plain'
 
 export const hasDragFiles = (event: DragEvent) =>

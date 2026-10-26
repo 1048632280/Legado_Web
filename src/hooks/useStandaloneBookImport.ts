@@ -1,19 +1,15 @@
 import API from '@api'
-import type { StandaloneBackupData } from '@/api/standalone'
+import type { LocalTextFile } from '@/api/standalone'
 import type { webReadConfig } from '@/web'
 import {
   clearReadingSession,
+  getErrorMessage,
   hasDragFiles,
   isTextFile,
 } from '@/utils/bookshelf'
-import {
-  downloadJson,
-  formatFileDate,
-  getErrorMessage,
-  readJsonFile,
-} from '@/utils/jsonFile'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ref } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 type UseStandaloneBookImportOptions = {
   loadingWrapper: (promise: Promise<unknown>) => Promise<unknown>
@@ -29,11 +25,13 @@ export const useStandaloneBookImport = ({
   resetReadingRecent,
 }: UseStandaloneBookImportOptions) => {
   const fileInput = ref<HTMLInputElement>()
-  const backupFileInput = ref<HTMLInputElement>()
   const isDraggingFile = ref(false)
   const dragDepth = ref(0)
+  const nativeDragActive = ref(false)
+  let skipNextDomDrop = false
+  let stopNativeDrag: (() => void) | undefined
 
-  const importTextFiles = async (files: File[]) => {
+  const importFiles = async (files: Array<File | LocalTextFile>) => {
     if (files.length === 0) return
 
     const textFiles = files.filter(isTextFile)
@@ -77,6 +75,17 @@ export const useStandaloneBookImport = ({
     if (importedCount > 0) await reloadShelf()
   }
 
+  const importTextFiles = async (files: File[]) => importFiles(files)
+
+  const importLocalPaths = async (paths: string[]) => {
+    try {
+      const files = await API.readLocalTextFiles(paths)
+      await importFiles(files)
+    } catch (error) {
+      ElMessage.error(`读取拖入内容失败：${getErrorMessage(error)}`)
+    }
+  }
+
   const importLocalBooks = async (event: Event) => {
     const input = event.target as HTMLInputElement
     const files = Array.from(input.files ?? [])
@@ -108,57 +117,60 @@ export const useStandaloneBookImport = ({
   const handleShelfDrop = async (event: DragEvent) => {
     if (!hasDragFiles(event)) return
     event.preventDefault()
+    if (nativeDragActive.value || skipNextDomDrop) {
+      skipNextDomDrop = false
+      return
+    }
     dragDepth.value = 0
     isDraggingFile.value = false
     await importTextFiles(Array.from(event.dataTransfer?.files ?? []))
   }
 
-  const exportStandaloneBackup = async () => {
+  const setupNativeDrag = async () => {
     try {
-      const result = await API.exportStandaloneData()
-      if (!result.data.isSuccess) {
-        ElMessage.error(result.data.errorMsg)
-        return
-      }
-      downloadJson(
-        `legado-web-backup_${formatFileDate(new Date())}.json`,
-        result.data.data,
-      )
-      ElMessage.success('本地数据备份已导出')
-    } catch (error) {
-      ElMessage.error(`导出备份失败：${getErrorMessage(error)}`)
+      stopNativeDrag = await getCurrentWindow().onDragDropEvent(event => {
+        const payload = event.payload
+        if (payload.type === 'enter') {
+          nativeDragActive.value = true
+          isDraggingFile.value = true
+          return
+        }
+        if (payload.type === 'over') {
+          nativeDragActive.value = true
+          isDraggingFile.value = true
+          return
+        }
+        if (payload.type === 'leave') {
+          nativeDragActive.value = false
+          isDraggingFile.value = false
+          return
+        }
+
+        nativeDragActive.value = false
+        isDraggingFile.value = false
+        skipNextDomDrop = true
+        window.setTimeout(() => {
+          skipNextDomDrop = false
+        }, 500)
+        void importLocalPaths(payload.paths)
+      })
+    } catch {
+      // 浏览器开发模式没有 Tauri 原生拖放事件，继续使用 DOM 拖放。
     }
   }
 
-  const importStandaloneBackup = async (event: Event) => {
-    const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
-    input.value = ''
-    if (file === undefined) return
+  onMounted(() => {
+    void setupNativeDrag()
+  })
 
-    try {
-      const backup = (await readJsonFile(file)) as StandaloneBackupData
-      const result = await API.importStandaloneData(backup)
-      if (!result.data.isSuccess) {
-        ElMessage.error(result.data.errorMsg)
-        return
-      }
-
-      const config = await API.getReadConfig()
-      setReadConfig(config)
-      resetReadingRecent()
-      clearReadingSession()
-      await reloadShelf()
-      ElMessage.success(result.data.data)
-    } catch (error) {
-      ElMessage.error(`恢复备份失败：${getErrorMessage(error)}`)
-    }
-  }
+  onUnmounted(() => {
+    stopNativeDrag?.()
+  })
 
   const clearStandaloneData = async () => {
     try {
       await ElMessageBox.confirm(
-        '此操作会删除当前存储中的书籍、章节、进度、阅读设置和源配置。生产服务会清空 PostgreSQL，接口不可用时会清空浏览器本地数据。确定继续？',
+        '此操作会删除 data 文件夹中的书籍、章节、进度和阅读设置。确定继续？',
         '清空数据',
         {
           confirmButtonText: '清空',
@@ -189,7 +201,6 @@ export const useStandaloneBookImport = ({
 
   return {
     fileInput,
-    backupFileInput,
     isDraggingFile,
     importTextFiles,
     importLocalBooks,
@@ -197,8 +208,6 @@ export const useStandaloneBookImport = ({
     handleShelfDragOver,
     handleShelfDragLeave,
     handleShelfDrop,
-    exportStandaloneBackup,
-    importStandaloneBackup,
     clearStandaloneData,
   }
 }
