@@ -421,10 +421,12 @@ fn main() -> Result<()> {
                     .iter()
                     .filter_map(|file| {
                         let path = std::path::PathBuf::from(file.as_str());
-                        path.extension()
+                        let is_txt = path
+                            .extension()
                             .and_then(|ext| ext.to_str())
                             .filter(|ext| ext.eq_ignore_ascii_case("txt"))
-                            .map(|_| path)
+                            .is_some();
+                        is_txt.then_some(path)
                     })
                     .collect();
                 if let Err(e) = import_paths(&w, &s, paths) {
@@ -446,10 +448,11 @@ fn main() -> Result<()> {
     }
     {
         let s = state.clone();
+        let chapter_state = s.clone();
         let w = ui.as_weak();
         ui.on_chapter_clicked(move |i| {
             if let Some(w) = w.upgrade() {
-                let _ = load_chapter(&w, &s, i);
+                let _ = load_chapter(&w, &chapter_state, i);
             }
         });
         ui.on_previous_clicked({
