@@ -173,6 +173,7 @@ fn book_id(path: &Path) -> String {
         .unwrap_or_else(|_| path.to_path_buf());
     format!("local://{}", stable.to_string_lossy())
 }
+
 fn load_books(conn: &Connection) -> Result<Vec<BookItem>> {
     let mut stmt = conn.prepare("SELECT id,name,author,chapter_count,current_chapter FROM books ORDER BY updated_at DESC, sort_order DESC")?;
     let rows = stmt.query_map([], |r| {
