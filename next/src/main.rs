@@ -140,6 +140,9 @@ fn split_chapters(text: &str) -> Vec<(String, String)> {
                 buf.trim().into(),
             ));
         }
+        if result.is_empty() {
+            result.push(("正文".into(), text.trim().to_string()));
+        }
         return result;
     }
     let mut result = Vec::new();
@@ -164,18 +167,12 @@ fn split_chapters(text: &str) -> Vec<(String, String)> {
     result
 }
 
-fn book_id(path: &Path, size: u64, modified: u64) -> String {
-    format!("local://{}:{}:{}", path.to_string_lossy(), size, modified)
+fn book_id(path: &Path) -> String {
+    let stable = path
+        .canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf());
+    format!("local://{}", stable.to_string_lossy())
 }
-fn modified(path: &Path) -> u64 {
-    fs::metadata(path)
-        .and_then(|m| m.modified())
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
-}
-
 fn load_books(conn: &Connection) -> Result<Vec<BookItem>> {
     let mut stmt = conn.prepare("SELECT id,name,author,chapter_count,current_chapter FROM books ORDER BY updated_at DESC, sort_order DESC")?;
     let rows = stmt.query_map([], |r| {
@@ -189,7 +186,7 @@ fn load_books(conn: &Connection) -> Result<Vec<BookItem>> {
             progress: (if count == 0 {
                 "未开始".into()
             } else {
-                format!("阅读到第 {} 章", current + 1)
+                format!("阅读到第 {} 章", current.clamp(0, count - 1) + 1)
             })
             .into(),
             index: 0,
@@ -267,7 +264,7 @@ fn filters(conn: &Connection, book: &str) -> Result<Vec<FilterItem>> {
 
 fn show_book(ui: &MainWindow, state: &AppState, id: &str) -> Result<()> {
     let conn = state.db.lock().unwrap();
-    let (title, author, current): (String, String, i32) = conn.query_row(
+    let (title, author, stored_current): (String, String, i32) = conn.query_row(
         "SELECT name,author,current_chapter FROM books WHERE id=?",
         [id],
         |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
@@ -284,6 +281,16 @@ fn show_book(ui: &MainWindow, state: &AppState, id: &str) -> Result<()> {
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
+    if list.is_empty() {
+        anyhow::bail!("这本书没有可阅读的章节");
+    }
+    let current = stored_current.clamp(0, list.len() as i32 - 1);
+    if current != stored_current {
+        conn.execute(
+            "UPDATE books SET current_chapter=? WHERE id=?",
+            params![current, id],
+        )?;
+    }
     state.current_book.lock().unwrap().replace(id.to_string());
     *state.current_chapter.lock().unwrap() = current;
     let filter_items = filters(&conn, id)?;
@@ -293,6 +300,9 @@ fn show_book(ui: &MainWindow, state: &AppState, id: &str) -> Result<()> {
     ui.set_selected_book_author(author.into());
     ui.set_chapters(ModelRc::new(VecModel::from(list)));
     ui.set_filters(ModelRc::new(VecModel::from(filter_items)));
+    ui.set_catalog_open(false);
+    ui.set_settings_open(false);
+    ui.set_filters_open(false);
     load_chapter(ui, state, current)?;
     Ok(())
 }
@@ -346,12 +356,15 @@ fn import_paths(ui: &MainWindow, state: &AppState, paths: Vec<std::path::PathBuf
     if paths.is_empty() {
         return Ok(());
     }
-    let conn = state.db.lock().unwrap();
+    let mut conn = state.db.lock().unwrap();
     let now = Utc::now().timestamp();
     let mut imported = 0;
     for path in paths {
         let meta = fs::metadata(&path)?;
-        let id = book_id(&path, meta.len(), modified(&path));
+        if !meta.is_file() {
+            continue;
+        }
+        let id = book_id(&path);
         let text = decode_text(&fs::read(&path)?);
         let chapters = split_chapters(&text);
         let name = path
@@ -359,15 +372,20 @@ fn import_paths(ui: &MainWindow, state: &AppState, paths: Vec<std::path::PathBuf
             .and_then(|x| x.to_str())
             .unwrap_or("未命名")
             .to_string();
-        conn.execute("INSERT INTO books(id,name,author,source_path,imported_at,updated_at,chapter_count,current_chapter,current_pos,sort_order) VALUES (?,?,?,?,?,?,?,0,0,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,updated_at=excluded.updated_at,chapter_count=excluded.chapter_count", params![id, name, "本地导入", path.to_string_lossy(), now, now, chapters.len() as i32, now])?;
-        conn.execute("DELETE FROM chapters WHERE book_id=?", [&id])?;
-        let tx = conn.unchecked_transaction()?;
+        let tx = conn.transaction()?;
+        tx.execute("INSERT INTO books(id,name,author,source_path,imported_at,updated_at,chapter_count,current_chapter,current_pos,sort_order) VALUES (?,?,?,?,?,?,?,0,0,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,source_path=excluded.source_path,updated_at=excluded.updated_at,chapter_count=excluded.chapter_count,sort_order=excluded.sort_order", params![id, name, "本地导入", path.to_string_lossy(), now, now, chapters.len() as i32, now])?;
+        tx.execute("DELETE FROM chapters WHERE book_id=?", [&id])?;
         for (index, (title, content)) in chapters.iter().enumerate() {
             tx.execute(
                 "INSERT INTO chapters(book_id,chapter_index,title,content) VALUES (?,?,?,?)",
                 params![id, index as i32, title, content],
             )?;
         }
+        let last_index = chapters.len().saturating_sub(1) as i32;
+        tx.execute(
+            "UPDATE books SET current_chapter=MIN(current_chapter, ?) WHERE id=?",
+            params![last_index, id],
+        )?;
         tx.commit()?;
         imported += 1;
     }
@@ -462,7 +480,9 @@ fn main() -> Result<()> {
         let w = ui.as_weak();
         ui.on_chapter_clicked(move |i| {
             if let Some(w) = w.upgrade() {
-                let _ = load_chapter(&w, &chapter_state, i);
+                if let Err(error) = load_chapter(&w, &chapter_state, i) {
+                    w.set_status(format!("跳转章节失败：{error}").into());
+                }
             }
         });
         ui.on_previous_clicked({
@@ -472,7 +492,9 @@ fn main() -> Result<()> {
                 if let Some(w) = w.upgrade() {
                     let i = *s.current_chapter.lock().unwrap();
                     if i > 0 {
-                        let _ = load_chapter(&w, &s, i - 1);
+                        if let Err(error) = load_chapter(&w, &s, i - 1) {
+                            w.set_status(format!("上一章失败：{error}").into());
+                        }
                     }
                 }
             }
@@ -493,7 +515,9 @@ fn main() -> Result<()> {
                         .unwrap_or(0);
                     drop(conn);
                     if i + 1 < count {
-                        let _ = load_chapter(&w, &s, i + 1);
+                        if let Err(error) = load_chapter(&w, &s, i + 1) {
+                            w.set_status(format!("下一章失败：{error}").into());
+                        }
                     }
                 }
             }
@@ -505,9 +529,22 @@ fn main() -> Result<()> {
         ui.on_book_delete(move |id| {
             if let Some(w) = w.upgrade() {
                 let c = s.db.lock().unwrap();
-                let _ = c.execute("DELETE FROM books WHERE id=?", [id.as_str()]);
-                let _ = set_books(&w, &c);
-                let _ = set_recent(&w, &c);
+                match c.execute("DELETE FROM books WHERE id=?", [id.as_str()]) {
+                    Ok(_) => {
+                        if s.current_book.lock().unwrap().as_deref() == Some(id.as_str()) {
+                            s.current_book.lock().unwrap().take();
+                            *s.current_chapter.lock().unwrap() = 0;
+                            w.set_page(0);
+                            w.set_catalog_open(false);
+                            w.set_settings_open(false);
+                            w.set_filters_open(false);
+                        }
+                        let _ = set_books(&w, &c);
+                        let _ = set_recent(&w, &c);
+                        w.set_status("书籍已删除".into());
+                    }
+                    Err(error) => w.set_status(format!("删除失败：{error}").into()),
+                }
             }
         });
     }
@@ -522,8 +559,14 @@ fn main() -> Result<()> {
                 let _ = set_books(&w, &c);
                 let _ = set_recent(&w, &c);
                 w.set_page(0);
+                s.current_book.lock().unwrap().take();
+                *s.current_chapter.lock().unwrap() = 0;
                 w.set_settings_open(false);
                 w.set_filters_open(false);
+                w.set_catalog_open(false);
+                w.set_search_text("".into());
+                w.set_filter_search("".into());
+                w.set_filter_replacement("".into());
                 w.set_theme(0);
                 w.set_font(4);
                 w.set_font_size(18);
@@ -555,6 +598,9 @@ fn main() -> Result<()> {
         ui.on_shelf_clicked(move || {
             if let Some(w) = shelf_w.upgrade() {
                 w.set_page(0);
+                w.set_catalog_open(false);
+                w.set_settings_open(false);
+                w.set_filters_open(false);
             }
         });
         let recent_s = s.clone();
@@ -562,7 +608,9 @@ fn main() -> Result<()> {
         ui.on_recent_clicked(move |id| {
             if let Some(w) = recent_w.upgrade() {
                 if !id.is_empty() {
-                    let _ = show_book(&w, &recent_s, id.as_str());
+                    if let Err(error) = show_book(&w, &recent_s, id.as_str()) {
+                        w.set_status(format!("打开最近阅读失败：{error}").into());
+                    }
                 }
             }
         });
@@ -599,18 +647,30 @@ fn main() -> Result<()> {
         let w = ui.as_weak();
         ui.on_add_filter(move |search, replacement| {
             if search.trim().is_empty() {
+                if let Some(w) = w.upgrade() {
+                    w.set_status("过滤内容不能为空".into());
+                }
                 return;
             }
             if let Some(w) = w.upgrade() {
                 if let Some(id) = s.current_book.lock().unwrap().clone() {
                     let c = s.db.lock().unwrap();
-                    let _ = c.execute(
+                    match c.execute(
                         "INSERT INTO filters(book_id,search,replacement) VALUES (?,?,?)",
                         params![id, search.as_str(), replacement.as_str()],
-                    );
-                    if let Ok(list) = filters(&c, &id) {
-                        w.set_filters(ModelRc::new(VecModel::from(list)));
+                    ) {
+                        Ok(_) => {
+                            if let Ok(list) = filters(&c, &id) {
+                                w.set_filters(ModelRc::new(VecModel::from(list)));
+                            }
+                            w.set_filter_search("".into());
+                            w.set_filter_replacement("".into());
+                            w.set_status("过滤规则已添加".into());
+                        }
+                        Err(error) => w.set_status(format!("添加过滤规则失败：{error}").into()),
                     }
+                } else {
+                    w.set_status("请先打开一本书".into());
                 }
             }
         });
@@ -619,11 +679,16 @@ fn main() -> Result<()> {
         ui.on_remove_filter(move |id| {
             if let Some(w) = w.upgrade() {
                 let c = s.db.lock().unwrap();
-                let _ = c.execute("DELETE FROM filters WHERE id=?", [id]);
-                if let Some(book) = s.current_book.lock().unwrap().clone() {
-                    if let Ok(list) = filters(&c, &book) {
-                        w.set_filters(ModelRc::new(VecModel::from(list)));
+                match c.execute("DELETE FROM filters WHERE id=?", [id]) {
+                    Ok(_) => {
+                        if let Some(book) = s.current_book.lock().unwrap().clone() {
+                            if let Ok(list) = filters(&c, &book) {
+                                w.set_filters(ModelRc::new(VecModel::from(list)));
+                            }
+                        }
+                        w.set_status("过滤规则已删除".into());
                     }
+                    Err(error) => w.set_status(format!("删除过滤规则失败：{error}").into()),
                 }
             }
         });
@@ -641,13 +706,17 @@ fn main() -> Result<()> {
                 cfg.line_spacing = line.clamp(0.2, 2.0);
                 cfg.paragraph_spacing = paragraph.clamp(0.0, 4.0);
                 cfg.read_width = read_width.clamp(620, 1100);
-                let _ = save_settings(&c, &cfg);
-                w.set_theme(cfg.theme);
-                w.set_font(cfg.font);
-                w.set_font_size(cfg.font_size);
-                w.set_line_spacing(cfg.line_spacing);
-                w.set_paragraph_spacing(cfg.paragraph_spacing);
-                w.set_read_width(cfg.read_width);
+                match save_settings(&c, &cfg) {
+                    Ok(()) => {
+                        w.set_theme(cfg.theme);
+                        w.set_font(cfg.font);
+                        w.set_font_size(cfg.font_size);
+                        w.set_line_spacing(cfg.line_spacing);
+                        w.set_paragraph_spacing(cfg.paragraph_spacing);
+                        w.set_read_width(cfg.read_width);
+                    }
+                    Err(error) => w.set_status(format!("保存阅读设置失败：{error}").into()),
+                }
             }
         });
     }
@@ -661,10 +730,14 @@ fn main() -> Result<()> {
                 cfg.letter_spacing = letter.clamp(-1.0, 2.0);
                 cfg.jump_duration = jump.clamp(0, 10000);
                 cfg.infinite_loading = infinite;
-                let _ = save_settings(&c, &cfg);
-                w.set_letter_spacing_value(cfg.letter_spacing);
-                w.set_jump_duration(cfg.jump_duration);
-                w.set_infinite_loading(cfg.infinite_loading);
+                match save_settings(&c, &cfg) {
+                    Ok(()) => {
+                        w.set_letter_spacing_value(cfg.letter_spacing);
+                        w.set_jump_duration(cfg.jump_duration);
+                        w.set_infinite_loading(cfg.infinite_loading);
+                    }
+                    Err(error) => w.set_status(format!("保存高级设置失败：{error}").into()),
+                }
             }
         });
     }
