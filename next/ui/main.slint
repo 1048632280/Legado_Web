@@ -40,7 +40,7 @@ export component MainWindow inherits Window {
     background: #f5f7fa;
 
     in property <int> page: 0;
-    in property <bool> catalog-open: false;
+    in-out property <bool> catalog-open: false;
     in property <string> selected-book-title: "书架";
     in property <string> selected-book-author: "";
     in property <string> recent-book-title: "";
@@ -49,8 +49,8 @@ export component MainWindow inherits Window {
     in property <string> chapter-content: "";
     in property <string> status: "";
     in property <string> search-text: "";
-    in property <string> filter-search: "";
-    in property <string> filter-replacement: "";
+    in-out property <string> filter-search: "";
+    in-out property <string> filter-replacement: "";
     in property <int> theme: 0;
     in property <int> font: 4;
     in property <int> font-size: 18;
@@ -60,13 +60,14 @@ export component MainWindow inherits Window {
     in property <int> jump-duration: 1000;
     in property <bool> infinite-loading: false;
     in property <int> read-width: 800;
-    in property <bool> settings-open: false;
-    in property <bool> filters-open: false;
-    in property <bool> sidebar-open: true;
+    in-out property <bool> settings-open: false;
+    in-out property <bool> filters-open: false;
+    in-out property <bool> sidebar-open: true;
     in property <[BookItem]> books;
     in property <[ChapterItem]> chapters;
     in property <[FilterItem]> filters;
 
+    pure callback transfer-to-paths(data-transfer) -> [string];
     callback import-clicked();
     callback files-dropped([string]);
     callback clear-clicked();
@@ -117,7 +118,7 @@ export component MainWindow inherits Window {
                 horizontal-stretch: 1;
                 VerticalLayout {
                     Rectangle {
-                        height: 66px; background: #ffffff; border-bottom-width: 1px; border-color: #e5e9ef;
+                        height: 66px; background: #ffffff; border-width: 1px; border-color: #e5e9ef;
                         HorizontalLayout { padding: 18px; spacing: 14px;
                             IconButton { icon: sidebar-open ? "‹" : "›"; clicked => { sidebar-open = !sidebar-open; } }
                             Text { text: page == 0 ? "书架" : selected-book-title; color: #1c2734; font-size: 20px; font-weight: 700; vertical-alignment: center; }
@@ -132,20 +133,26 @@ export component MainWindow inherits Window {
                         if page == 0: Rectangle {
                             background: #f5f7fa;
                             drop := DropArea {
-                                dropped(files) => { files-dropped(files); }
+                                can-drop(event) => {
+                                    transfer-to-paths(event.data).length > 0 ? DragAction.copy : DragAction.none
+                                }
+                                dropped(event) => {
+                                    files-dropped(transfer-to-paths(event.data));
+                                    return event.proposed-action;
+                                }
                             }
                             VerticalLayout { padding: 28px; spacing: 18px;
                                 HorizontalLayout { height: 54px; Text { text: "本地书架"; color: #1c2734; font-size: 28px; font-weight: 700; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } Button { text: "清空数据"; clicked => { clear-clicked(); } } Button { text: "+  导入 TXT"; clicked => { import-clicked(); } } }
                                 if books.length == 0: Rectangle { vertical-stretch: 1; border-radius: 14px; background: #ffffff; border-width: 1px; border-color: #e4e9f0; VerticalLayout { alignment: center; spacing: 12px; Text { text: "还没有书籍"; color: #253246; font-size: 22px; font-weight: 600; horizontal-alignment: center; } Text { text: "导入本地 TXT 文件，开始你的阅读。"; color: #7e8b9c; font-size: 14px; horizontal-alignment: center; } Button { text: "选择 TXT 文件"; clicked => { import-clicked(); } } } }
-                                if books.length > 0: ScrollView { vertical-stretch: 1; ListView { for book in books: Rectangle { height: 96px; width: parent.width; border-radius: 12px; background: touch.pressed ? #eaf1ff : (touch.has-hover ? #fbfcfe : #ffffff); border-width: 1px; border-color: #e2e8f0; HorizontalLayout { padding: 16px; spacing: 16px; Rectangle { width: 46px; height: 62px; border-radius: 7px; background: #dbe8fb; Text { text: "TXT"; color: #3c6ca9; font-size: 11px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; } } VerticalLayout { spacing: 5px; Text { text: book.title; color: #202d3d; font-size: 16px; font-weight: 600; } Text { text: book.author + "  ·  " + book.chapters + " 章"; color: #8a96a5; font-size: 12px; } Text { text: book.progress; color: #5c83b6; font-size: 12px; } } Rectangle { horizontal-stretch: 1; } IconButton { icon: "⋯"; clicked => { book-delete(book.id); } } } TouchArea { clicked => { book-clicked(book.id); } } } } }
+                                if books.length > 0: ScrollView { vertical-stretch: 1; VerticalLayout { for book in books: Rectangle { height: 96px; width: parent.width; border-radius: 12px; background: touch.pressed ? #eaf1ff : (touch.has-hover ? #fbfcfe : #ffffff); border-width: 1px; border-color: #e2e8f0; HorizontalLayout { padding: 16px; spacing: 16px; Rectangle { width: 46px; height: 62px; border-radius: 7px; background: #dbe8fb; Text { text: "TXT"; color: #3c6ca9; font-size: 11px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; } } VerticalLayout { spacing: 5px; Text { text: book.title; color: #202d3d; font-size: 16px; font-weight: 600; } Text { text: book.author + "  ·  " + book.chapters + " 章"; color: #8a96a5; font-size: 12px; } Text { text: book.progress; color: #5c83b6; font-size: 12px; } } Rectangle { horizontal-stretch: 1; } IconButton { icon: "⋯"; clicked => { book-delete(book.id); } } } touch := TouchArea { clicked => { book-clicked(book.id); } } } } }
                             }
                         }
                         if page == 1: Rectangle {
                             background: theme == 6 ? #202124 : (theme == 4 ? #fff3f3 : #fbfaf7);
-                            ScrollView { HorizontalLayout { alignment: center; Rectangle { width: read-width; min-width: 620px; max-width: 1100px; padding: 50px; VerticalLayout { spacing: 20px; Text { text: selected-chapter-title; color: theme == 6 ? #f1f3f4 : #26323f; font-size: font-size + 5px; font-weight: 700; } Text { text: selected-book-author; color: theme == 6 ? #9aa0a6 : #8b7d72; font-size: 12px; } Text { text: chapter-content; color: theme == 6 ? #e8eaed : #3b3a38; font-family: font == 0 ? "SimSun" : (font == 1 ? "SimHei" : (font == 2 ? "KaiTi" : (font == 3 ? "PingFang SC" : "Microsoft YaHei"))); font-size: font-size; line-height: 1.0 + line-spacing; letter-spacing: 0px; wrap: word-wrap; } } } }
-                            Rectangle { x: 0px; y: parent.height - 62px; height: 62px; width: parent.width; background: #ffffffdd; border-top-width: 1px; border-color: #e7ebef; HorizontalLayout { padding: 16px; spacing: 10px; Button { text: "‹ 上一章"; clicked => { previous-clicked(); } } Rectangle { horizontal-stretch: 1; } Text { text: status; color: #8a96a5; font-size: 12px; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } Button { text: "下一章 ›"; clicked => { next-clicked(); } } } }
+                            ScrollView { HorizontalLayout { alignment: center; Rectangle { width: read-width * 1px; min-width: 620px; max-width: 1100px; padding: 50px; VerticalLayout { spacing: 20px; Text { text: selected-chapter-title; color: theme == 6 ? #f1f3f4 : #26323f; font-size: (font-size + 5) * 1px; font-weight: 700; } Text { text: selected-book-author; color: theme == 6 ? #9aa0a6 : #8b7d72; font-size: 12px; } Text { text: chapter-content; color: theme == 6 ? #e8eaed : #3b3a38; font-family: font == 0 ? "SimSun" : (font == 1 ? "SimHei" : (font == 2 ? "KaiTi" : (font == 3 ? "PingFang SC" : "Microsoft YaHei"))); font-size: font-size * 1px; letter-spacing: 0px; wrap: word-wrap; } } } }
+                            Rectangle { x: 0px; y: parent.height - 62px; height: 62px; width: parent.width; background: #ffffffdd; border-width: 1px; border-color: #e7ebef; HorizontalLayout { padding: 16px; spacing: 10px; Button { text: "‹ 上一章"; clicked => { previous-clicked(); } } Rectangle { horizontal-stretch: 1; } Text { text: status; color: #8a96a5; font-size: 12px; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } Button { text: "下一章 ›"; clicked => { next-clicked(); } } } }
                         }
-                        if catalog-open: Rectangle { x: 0px; y: 0px; width: 320px; height: parent.height - 62px; background: #ffffff; border-right-width: 1px; border-color: #e0e6ee; VerticalLayout { padding: 20px; spacing: 10px; Text { text: "章节目录"; color: #253246; font-size: 17px; font-weight: 700; } ScrollView { vertical-stretch: 1; ListView { for chapter in chapters: Rectangle { height: 38px; width: parent.width; Text { text: chapter.title; color: #586679; font-size: 13px; vertical-alignment: center; overflow: elide; } TouchArea { clicked => { chapter-clicked(chapter.index); catalog-open = false; } } } } } Button { text: "关闭目录"; clicked => { catalog-open = false; } } } }
+                        if catalog-open: Rectangle { x: 0px; y: 0px; width: 320px; height: parent.height - 62px; background: #ffffff; border-width: 1px; border-color: #e0e6ee; VerticalLayout { padding: 20px; spacing: 10px; Text { text: "章节目录"; color: #253246; font-size: 17px; font-weight: 700; } ScrollView { vertical-stretch: 1; VerticalLayout { for chapter in chapters: Rectangle { height: 38px; width: parent.width; Text { text: chapter.title; color: #586679; font-size: 13px; vertical-alignment: center; overflow: elide; } TouchArea { clicked => { chapter-clicked(chapter.index); catalog-open = false; } } } } } Button { text: "关闭目录"; clicked => { catalog-open = false; } } } }
                     }
                 }
             }
@@ -162,5 +169,5 @@ export component MainWindow inherits Window {
                         Text { text: "字体"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 5px; Button { text: "宋"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 0); } } Button { text: "黑"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 1); } } Button { text: "楷"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 2); } } Button { text: "苹"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 3); } } Button { text: "雅黑"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 4); } } }
                         Rectangle { vertical-stretch: 1; } Button { text: "关闭"; clicked => { close-panel(); } }
                     } }
-    if filters-open: Rectangle { x: parent.width - 410px; y: 66px; width: 390px; height: 560px; background: #ffffff; border-width: 1px; border-color: #dfe5ed; border-radius: 12px; VerticalLayout { padding: 24px; spacing: 12px; Text { text: "内容过滤"; color: #1f2b3a; font-size: 18px; font-weight: 700; } Text { text: "阅读时自动替换或删除匹配内容"; color: #8994a3; font-size: 12px; } TextEdit { height: 72px; text: filter-search; placeholder-text: "过滤内容"; edited(text) => { filter-search = text; } } TextEdit { height: 72px; text: filter-replacement; placeholder-text: "替换内容（留空表示删除）"; edited(text) => { filter-replacement = text; } } Button { text: "+  添加规则"; clicked => { add-filter(filter-search, filter-replacement); } } Text { text: "已有规则"; color: #7b8796; font-size: 12px; } ScrollView { vertical-stretch: 1; ListView { for rule in filters: Rectangle { height: 58px; border-bottom-width: 1px; border-color: #edf0f4; HorizontalLayout { padding: 8px; spacing: 8px; VerticalLayout { horizontal-stretch: 1; Text { text: rule.search; color: #2d3948; font-size: 12px; } Text { text: rule.replacement == "" ? "删除" : "→ " + rule.replacement; color: #8994a3; font-size: 11px; } } Button { text: "删除"; clicked => { remove-filter(rule.id); } } } } } } Button { text: "关闭"; clicked => { close-panel(); } } } }
+    if filters-open: Rectangle { x: parent.width - 410px; y: 66px; width: 390px; height: 560px; background: #ffffff; border-width: 1px; border-color: #dfe5ed; border-radius: 12px; VerticalLayout { padding: 24px; spacing: 12px; Text { text: "内容过滤"; color: #1f2b3a; font-size: 18px; font-weight: 700; } Text { text: "阅读时自动替换或删除匹配内容"; color: #8994a3; font-size: 12px; } TextEdit { height: 72px; text: filter-search; placeholder-text: "过滤内容"; edited(text) => { filter-search = text; } } TextEdit { height: 72px; text: filter-replacement; placeholder-text: "替换内容（留空表示删除）"; edited(text) => { filter-replacement = text; } } Button { text: "+  添加规则"; clicked => { add-filter(filter-search, filter-replacement); } } Text { text: "已有规则"; color: #7b8796; font-size: 12px; } ScrollView { vertical-stretch: 1; VerticalLayout { for rule in filters: Rectangle { height: 58px; border-width: 1px; border-color: #edf0f4; HorizontalLayout { padding: 8px; spacing: 8px; VerticalLayout { horizontal-stretch: 1; Text { text: rule.search; color: #2d3948; font-size: 12px; } Text { text: rule.replacement == "" ? "删除" : "→ " + rule.replacement; color: #8994a3; font-size: 11px; } } Button { text: "删除"; clicked => { remove-filter(rule.id); } } } } } } Button { text: "关闭"; clicked => { close-panel(); } } } }
 }

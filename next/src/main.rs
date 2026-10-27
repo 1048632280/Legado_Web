@@ -367,6 +367,15 @@ fn import_paths(ui: &MainWindow, state: &AppState, paths: Vec<std::path::PathBuf
 
 fn main() -> Result<()> {
     let ui = MainWindow::new()?;
+    ui.on_transfer_to_paths(|transfer| {
+        transfer
+            .file_paths()
+            .ok()
+            .into_iter()
+            .flatten()
+            .map(|path| path.to_string_lossy().to_string().into())
+            .collect()
+    });
     let conn = open_db()?;
     let state = AppState {
         db: Arc::new(Mutex::new(conn)),
