@@ -192,9 +192,18 @@ fn load_books(conn: &Connection) -> Result<Vec<BookItem>> {
                 format!("阅读到第 {} 章", current + 1)
             })
             .into(),
+            index: 0,
         })
     })?;
-    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    Ok(rows
+        .collect::<rusqlite::Result<Vec<_>>>()?
+        .into_iter()
+        .enumerate()
+        .map(|(index, mut book)| {
+            book.index = index as i32;
+            book
+        })
+        .collect())
 }
 
 fn load_books_matching(conn: &Connection, query: &str) -> Result<Vec<BookItem>> {

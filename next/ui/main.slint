@@ -6,40 +6,41 @@ export struct BookItem {
     author: string,
     chapters: int,
     progress: string,
-}
-
-export struct ChapterItem {
     index: int,
-    title: string,
 }
 
-export struct FilterItem {
-    id: int,
-    search: string,
-    replacement: string,
-}
+export struct ChapterItem { index: int, title: string }
+export struct FilterItem { id: int, search: string, replacement: string }
 
-component IconButton inherits Rectangle {
-    in property <string> icon;
-    in property <string> hint;
+component ToolItem inherits Rectangle {
+    in property <string> symbol;
+    in property <string> label;
     callback clicked();
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: touch.pressed ? #e8edf5 : (touch.has-hover ? #eef2f7 : transparent);
-    Text { text: icon; color: #536174; font-size: 17px; horizontal-alignment: center; vertical-alignment: center; }
+    width: 58px;
+    height: 58px;
+    background: touch.pressed ? #f2e7e7 : (touch.has-hover ? #faf2f2 : transparent);
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.1);
+    VerticalLayout { padding: 7px 0px 4px; spacing: 2px; Text { text: symbol; color: #333333; font-size: 17px; horizontal-alignment: center; } Text { text: label; color: rgba(0, 0, 0, 0.48); font-size: 12px; horizontal-alignment: center; } }
     touch := TouchArea { clicked => { root.clicked(); } }
 }
 
+component Stepper inherits Rectangle {
+    in property <string> value;
+    callback decrement();
+    callback increment();
+    height: 28px;
+    HorizontalLayout { spacing: 8px; Button { text: "−"; width: 28px; clicked => { root.decrement(); } } Text { text: value; width: 52px; horizontal-alignment: center; vertical-alignment: center; color: #333333; font-size: 13px; } Button { text: "+"; width: 28px; clicked => { root.increment(); } } }
+}
+
 export component MainWindow inherits Window {
-    title: "Legado Next";
+    title: "阅读";
     width: 1240px;
     height: 800px;
-    background: #f5f7fa;
-
+    background: #f5f7fb;
     in property <int> page: 0;
     in-out property <bool> catalog-open: false;
-    in property <string> selected-book-title: "书架";
+    in property <string> selected-book-title: "";
     in property <string> selected-book-author: "";
     in property <string> recent-book-title: "";
     in property <string> recent-book-id: "";
@@ -60,11 +61,10 @@ export component MainWindow inherits Window {
     in property <int> read-width: 800;
     in-out property <bool> settings-open: false;
     in-out property <bool> filters-open: false;
-    in-out property <bool> sidebar-open: true;
+    in-out property <bool> toolbar-open: true;
     in property <[BookItem]> books;
     in property <[ChapterItem]> chapters;
     in property <[FilterItem]> filters;
-
     pure callback transfer-to-paths(data-transfer) -> [string];
     callback import-clicked();
     callback files-dropped([string]);
@@ -85,88 +85,72 @@ export component MainWindow inherits Window {
     callback save-settings(int, int, int, float, float, int);
     callback save-advanced-settings(float, int, bool);
 
-    Rectangle {
-        background: #f5f7fa;
+    if page == 0: Rectangle {
+        background: #f5f7fb;
         HorizontalLayout {
             spacing: 0px;
             Rectangle {
-                width: sidebar-open ? 248px : 68px;
-                background: #182230;
-                animate width { duration: 160ms; }
+                width: 272px; background: #f7f7f7; border-width: 1px; border-color: #e5e9f0;
                 VerticalLayout {
-                    padding: 18px;
-                    spacing: 20px;
-                    Rectangle { height: 32px; HorizontalLayout { spacing: 10px; Text { text: "◈"; color: #74a7ff; font-size: 23px; } if sidebar-open: Text { text: "LEGADO NEXT"; color: #f4f7fb; font-size: 16px; font-weight: 700; vertical-alignment: center; } } }
-                    Rectangle { height: 1px; background: #2c3949; }
+                    padding: 40px 28px 32px; spacing: 0px;
+                    Text { text: "阅读"; color: #33373d; font-size: 24px; font-weight: 700; }
+                    Text { text: "本地 TXT 阅读器"; color: #606975; font-size: 14px; y: 12px; }
+                    LineEdit { y: 54px; height: 36px; text: search-text; placeholder-text: "筛选本地书架"; edited(text) => { search-changed(text); } }
+                    Text { text: "最近阅读"; y: 132px; color: #606975; font-size: 14px; }
                     Rectangle {
-                        height: 42px; border-radius: 9px; background: page == 0 ? #2c5d9e : transparent;
-                        HorizontalLayout { padding: 12px; spacing: 12px; Text { text: "▦"; color: #dce9fb; font-size: 18px; vertical-alignment: center; } if sidebar-open: Text { text: "我的书架"; color: #f3f7ff; font-size: 14px; vertical-alignment: center; } }
-                        TouchArea { clicked => { shelf-clicked(); } }
-                    }
-                    if recent-book-title != "": Rectangle {
-                        height: 58px; border-radius: 9px; background: #202d3d;
-                        VerticalLayout { padding: 10px; spacing: 3px; Text { text: "最近阅读"; color: #8fa5c2; font-size: 10px; } Text { text: recent-book-title; color: #f3f7ff; font-size: 12px; overflow: elide; } }
+                        y: 160px; height: 38px; border-radius: 10px; border-width: 1px; border-color: #c8dcf7; background: recent-book-title == "" ? #f1f4f8 : #eef5ff;
+                        Text { text: recent-book-title == "" ? "暂无阅读记录" : recent-book-title; x: 12px; width: parent.width - 24px; color: recent-book-title == "" ? #9aa3af : #3478c8; font-size: 13px; vertical-alignment: center; overflow: elide; }
                         TouchArea { clicked => { recent-clicked(recent-book-id); } }
                     }
+                    Text { text: "本地数据"; y: 230px; color: #606975; font-size: 14px; }
+                    Button { y: 258px; text: "导入 TXT"; width: parent.width; height: 36px; clicked => { import-clicked(); } }
+                    Button { y: 304px; text: "清空数据"; width: parent.width; height: 36px; clicked => { clear-clicked(); } }
                     Rectangle { vertical-stretch: 1; }
-                    if sidebar-open: Text { text: "纯本地 · 无网络 · SQLite"; color: #8190a5; font-size: 11px; horizontal-alignment: center; }
+                    Text { text: "纯本地 · 无网络 · SQLite"; color: #8a94a3; font-size: 11px; horizontal-alignment: center; }
                 }
             }
             Rectangle {
-                horizontal-stretch: 1;
+                horizontal-stretch: 1; background: #f5f7fb;
+                drop := DropArea {
+                    can-drop(event) => { transfer-to-paths(event.data).length > 0 ? DragAction.copy : DragAction.none }
+                    dropped(event) => { files-dropped(transfer-to-paths(event.data)); return event.proposed-action; }
+                }
                 VerticalLayout {
-                    Rectangle {
-                        height: 66px; background: #ffffff; border-width: 1px; border-color: #e5e9ef;
-                        HorizontalLayout { padding: 18px; spacing: 14px;
-                            IconButton { icon: sidebar-open ? "‹" : "›"; clicked => { sidebar-open = !sidebar-open; } }
-                            Text { text: page == 0 ? "书架" : selected-book-title; color: #1c2734; font-size: 20px; font-weight: 700; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            if page == 0: LineEdit { width: 220px; height: 34px; text: search-text; placeholder-text: "筛选书架"; edited(text) => { search-changed(text); } }
-                            if page == 1: IconButton { icon: "☷"; hint: "目录"; clicked => { catalog-open = !catalog-open; filters-open = false; settings-open = false; } }
-                            if page == 1: IconButton { icon: "Aa"; hint: "阅读设置"; clicked => { settings-clicked(); } }
-                            if page == 1: IconButton { icon: "⌁"; hint: "内容过滤"; clicked => { filters-clicked(); } }
-                        }
+                    padding: 40px; spacing: 16px;
+                    if books.length == 0: Rectangle {
+                        vertical-stretch: 1; border-width: 1px; border-color: #e5e9f0; border-radius: 18px; background: #ffffff;
+                        VerticalLayout { alignment: center; spacing: 12px; Text { text: "导入 TXT 开始阅读"; color: #33373d; font-size: 22px; font-weight: 700; horizontal-alignment: center; } Text { text: "选择本地 TXT 文件，或直接拖拽到书架区域导入。"; color: #606975; font-size: 14px; horizontal-alignment: center; } Button { text: "导入 TXT"; clicked => { import-clicked(); } } }
                     }
-                    Rectangle { horizontal-stretch: 1; vertical-stretch: 1;
-                        if page == 0: Rectangle {
-                            background: #f5f7fa;
-                            drop := DropArea {
-                                can-drop(event) => {
-                                    transfer-to-paths(event.data).length > 0 ? DragAction.copy : DragAction.none
+                    if books.length > 0: ScrollView {
+                        vertical-stretch: 1;
+                        GridLayout {
+                            spacing: 16px;
+                            for book in books: Rectangle {
+                                row: book.index / 2; col: book.index % 2; width: 340px; height: 144px; border-width: 1px; border-color: #e5e9f0; border-radius: 16px;
+                                background: touch.pressed ? #f5f9ff : (touch.has-hover ? #ffffff : rgba(255, 255, 255, 0.84));
+                                HorizontalLayout { padding: 16px; spacing: 16px;
+                                    Rectangle { width: 80px; height: 112px; border-radius: 11px; background: #e9c9a6; VerticalLayout { alignment: center; spacing: 5px; Text { text: "阅"; color: #ffffff; font-size: 28px; horizontal-alignment: center; } Text { text: book.title; color: #ffffff; font-size: 11px; horizontal-alignment: center; overflow: elide; } } }
+                                    VerticalLayout { spacing: 6px; Text { text: book.title; color: #33373d; font-size: 16px; font-weight: 700; overflow: elide; } Text { text: book.author + "  ·  共 " + book.chapters + " 章"; color: #606975; font-size: 12px; overflow: elide; } Text { text: "已读：" + book.progress; color: #606975; font-size: 12px; overflow: elide; } Rectangle { vertical-stretch: 1; } Button { text: "删除"; width: 44px; height: 26px; clicked => { book-delete(book.id); } } }
                                 }
-                                dropped(event) => {
-                                    files-dropped(transfer-to-paths(event.data));
-                                    return event.proposed-action;
-                                }
-                            }
-                            VerticalLayout { padding: 28px; spacing: 18px;
-                                HorizontalLayout { height: 54px; Text { text: "本地书架"; color: #1c2734; font-size: 28px; font-weight: 700; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } Button { text: "清空数据"; clicked => { clear-clicked(); } } Button { text: "+  导入 TXT"; clicked => { import-clicked(); } } }
-                                if books.length == 0: Rectangle { vertical-stretch: 1; border-radius: 14px; background: #ffffff; border-width: 1px; border-color: #e4e9f0; VerticalLayout { alignment: center; spacing: 12px; Text { text: "还没有书籍"; color: #253246; font-size: 22px; font-weight: 600; horizontal-alignment: center; } Text { text: "导入本地 TXT 文件，开始你的阅读。"; color: #7e8b9c; font-size: 14px; horizontal-alignment: center; } Button { text: "选择 TXT 文件"; clicked => { import-clicked(); } } } }
-                                if books.length > 0: ScrollView { vertical-stretch: 1; VerticalLayout { for book in books: Rectangle { height: 96px; border-radius: 12px; background: touch.pressed ? #eaf1ff : (touch.has-hover ? #fbfcfe : #ffffff); border-width: 1px; border-color: #e2e8f0; HorizontalLayout { padding: 16px; spacing: 16px; Rectangle { width: 46px; height: 62px; border-radius: 7px; background: #dbe8fb; Text { text: "TXT"; color: #3c6ca9; font-size: 11px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; } } VerticalLayout { spacing: 5px; Text { text: book.title; color: #202d3d; font-size: 16px; font-weight: 600; } Text { text: book.author + "  ·  " + book.chapters + " 章"; color: #8a96a5; font-size: 12px; } Text { text: book.progress; color: #5c83b6; font-size: 12px; } } Rectangle { horizontal-stretch: 1; } IconButton { icon: "⋯"; clicked => { book-delete(book.id); } } } touch := TouchArea { clicked => { book-clicked(book.id); } } } } }
+                                touch := TouchArea { clicked => { book-clicked(book.id); } }
                             }
                         }
-                        if page == 1: Rectangle {
-                            background: theme == 6 ? #202124 : (theme == 4 ? #fff3f3 : #fbfaf7);
-                            ScrollView { HorizontalLayout { alignment: center; VerticalLayout { width: read-width * 1px; padding: 50px; spacing: 20px; Text { text: selected-chapter-title; color: theme == 6 ? #f1f3f4 : #26323f; font-size: (font-size + 5) * 1px; font-weight: 700; } Text { text: selected-book-author; color: theme == 6 ? #9aa0a6 : #8b7d72; font-size: 12px; } Text { text: chapter-content; color: theme == 6 ? #e8eaed : #3b3a38; font-family: font == 0 ? "SimSun" : (font == 1 ? "SimHei" : (font == 2 ? "KaiTi" : (font == 3 ? "PingFang SC" : "Microsoft YaHei"))); font-size: font-size * 1px; letter-spacing: 0px; wrap: word-wrap; } } } }
-                            Rectangle { x: 0px; y: parent.height - 62px; height: 62px; width: parent.width; background: #ffffffdd; border-width: 1px; border-color: #e7ebef; HorizontalLayout { padding: 16px; spacing: 10px; Button { text: "‹ 上一章"; clicked => { previous-clicked(); } } Rectangle { horizontal-stretch: 1; } Text { text: status; color: #8a96a5; font-size: 12px; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } Button { text: "下一章 ›"; clicked => { next-clicked(); } } } }
-                        }
-                        if catalog-open: Rectangle { x: 0px; y: 0px; width: 320px; height: parent.height - 62px; background: #ffffff; border-width: 1px; border-color: #e0e6ee; VerticalLayout { padding: 20px; spacing: 10px; Text { text: "章节目录"; color: #253246; font-size: 17px; font-weight: 700; } ScrollView { vertical-stretch: 1; VerticalLayout { for chapter in chapters: Rectangle { height: 38px; Text { text: chapter.title; color: #586679; font-size: 13px; vertical-alignment: center; overflow: elide; } TouchArea { clicked => { chapter-clicked(chapter.index); catalog-open = false; } } } } } Button { text: "关闭目录"; clicked => { catalog-open = false; } } } }
                     }
                 }
             }
         }
     }
 
-    if settings-open: Rectangle { x: parent.width - 360px; y: 66px; width: 340px; height: 510px; background: #ffffff; border-width: 1px; border-color: #dfe5ed; border-radius: 12px; VerticalLayout { padding: 24px; spacing: 14px; Text { text: "阅读设置"; color: #1f2b3a; font-size: 18px; font-weight: 700; } Text { text: "主题"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 7px; Rectangle { width: 34px; height: 28px; border-radius: 6px; background: #f1ede4; border-width: theme == 0 ? 2px : 0px; border-color: #4f82c2; TouchArea { clicked => { save-settings(0, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 34px; height: 28px; border-radius: 6px; background: #f1ede4; border-width: theme == 1 ? 2px : 0px; border-color: #4f82c2; TouchArea { clicked => { save-settings(1, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 34px; height: 28px; border-radius: 6px; background: #e5f2e7; border-width: theme == 2 ? 2px : 0px; border-color: #4f82c2; TouchArea { clicked => { save-settings(2, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 34px; height: 28px; border-radius: 6px; background: #f1ede4; border-width: theme == 3 ? 2px : 0px; border-color: #4f82c2; TouchArea { clicked => { save-settings(3, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 34px; height: 28px; border-radius: 6px; background: #ffe4e4; border-width: theme == 4 ? 2px : 0px; border-color: #4f82c2; TouchArea { clicked => { save-settings(4, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 34px; height: 28px; border-radius: 6px; background: #dfe3e8; border-width: theme == 5 ? 2px : 0px; border-color: #4f82c2; TouchArea { clicked => { save-settings(5, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 34px; height: 28px; border-radius: 6px; background: #202124; border-width: theme == 6 ? 2px : 0px; border-color: #4f82c2; TouchArea { clicked => { save-settings(6, font-size, read-width, line-spacing, paragraph-spacing, font); } } } } }
-                        VerticalLayout { y: 120px;
-                        Text { text: "字体大小"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 8px; Button { text: "−"; clicked => { save-settings(theme, font-size - 2, read-width, line-spacing, paragraph-spacing, font); } } Text { text: font-size + " px"; horizontal-alignment: center; vertical-alignment: center; } Button { text: "+"; clicked => { save-settings(theme, font-size + 2, read-width, line-spacing, paragraph-spacing, font); } } }
-                        Text { text: "行距与段距"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 8px; Button { text: "−"; clicked => { save-settings(theme, font-size, read-width, line-spacing - 0.1, paragraph-spacing - 0.1, font); } } Text { text: line-spacing; horizontal-alignment: center; vertical-alignment: center; } Button { text: "+"; clicked => { save-settings(theme, font-size, read-width, line-spacing + 0.1, paragraph-spacing + 0.1, font); } } }
-                        Text { text: "正文宽度"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 8px; Button { text: "−"; clicked => { save-settings(theme, font-size, read-width - 80, line-spacing, paragraph-spacing, font); } } Text { text: read-width + " px"; horizontal-alignment: center; vertical-alignment: center; } Button { text: "+"; clicked => { save-settings(theme, font-size, read-width + 80, line-spacing, paragraph-spacing, font); } } }
-                        Text { text: "字距"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 8px; Button { text: "−"; clicked => { save-advanced-settings(letter-spacing-value - 0.01, jump-duration, infinite-loading); } } Text { text: letter-spacing-value; horizontal-alignment: center; vertical-alignment: center; } Button { text: "+"; clicked => { save-advanced-settings(letter-spacing-value + 0.01, jump-duration, infinite-loading); } } }
-                        Text { text: "翻页速度"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 8px; Button { text: "−"; clicked => { save-advanced-settings(letter-spacing-value, jump-duration - 100, infinite-loading); } } Text { text: jump-duration + " ms"; horizontal-alignment: center; vertical-alignment: center; } Button { text: "+"; clicked => { save-advanced-settings(letter-spacing-value, jump-duration + 100, infinite-loading); } } }
-                        Text { text: "无限加载"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 8px; Button { text: infinite-loading ? "关闭" : "开启"; clicked => { save-advanced-settings(letter-spacing-value, jump-duration, !infinite-loading); } } }
-                        Text { text: "字体"; color: #7b8796; font-size: 12px; } HorizontalLayout { spacing: 5px; Button { text: "宋"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 0); } } Button { text: "黑"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 1); } } Button { text: "楷"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 2); } } Button { text: "苹"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 3); } } Button { text: "雅黑"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 4); } } }
-                        Rectangle { vertical-stretch: 1; } Button { text: "关闭"; clicked => { close-panel(); } }
-                    } }
-    if filters-open: Rectangle { x: parent.width - 410px; y: 66px; width: 390px; height: 560px; background: #ffffff; border-width: 1px; border-color: #dfe5ed; border-radius: 12px; VerticalLayout { padding: 24px; spacing: 12px; Text { text: "内容过滤"; color: #1f2b3a; font-size: 18px; font-weight: 700; } Text { text: "阅读时自动替换或删除匹配内容"; color: #8994a3; font-size: 12px; } TextEdit { height: 72px; text: filter-search; placeholder-text: "过滤内容"; edited(text) => { filter-search = text; } } TextEdit { height: 72px; text: filter-replacement; placeholder-text: "替换内容（留空表示删除）"; edited(text) => { filter-replacement = text; } } Button { text: "+  添加规则"; clicked => { add-filter(filter-search, filter-replacement); } } Text { text: "已有规则"; color: #7b8796; font-size: 12px; } ScrollView { vertical-stretch: 1; VerticalLayout { for rule in filters: Rectangle { height: 58px; border-width: 1px; border-color: #edf0f4; HorizontalLayout { padding: 8px; spacing: 8px; VerticalLayout { horizontal-stretch: 1; Text { text: rule.search; color: #2d3948; font-size: 12px; } Text { text: rule.replacement == "" ? "删除" : "→ " + rule.replacement; color: #8994a3; font-size: 11px; } } Button { text: "删除"; clicked => { remove-filter(rule.id); } } } } } } Button { text: "关闭"; clicked => { close-panel(); } } } }
+    if page == 1: Rectangle {
+        background: theme == 6 ? #202124 : (theme == 4 ? #f5e4e4 : #ede7da);
+        TouchArea { clicked => { toolbar-open = !toolbar-open; } }
+        ScrollView { width: parent.width; height: parent.height; HorizontalLayout { alignment: center; VerticalLayout { width: read-width * 1px; padding: 0px 65px; spacing: 0px; Rectangle { height: 64px; } Text { text: selected-chapter-title; color: theme == 6 ? #eeeeee : #262626; font-size: (font-size + 6) * 1px; font-weight: 400; font-family: "Microsoft YaHei"; } Text { text: selected-book-author; color: theme == 6 ? #9a9a9a : #8b7d72; font-size: 12px; y: 12px; } Text { text: chapter-content; color: theme == 6 ? #d5d5d5 : #262626; font-size: font-size * 1px; font-family: font == 0 ? "SimSun" : (font == 1 ? "SimHei" : (font == 2 ? "KaiTi" : (font == 3 ? "PingFang SC" : "Microsoft YaHei"))); wrap: word-wrap; y: 48px; } Rectangle { height: 64px; } } } }
+        if toolbar-open: Rectangle { x: parent.width / 2 - read-width * 1px / 2 - 68px; y: parent.height / 2 - 174px; width: 58px; height: 348px; background: theme == 6 ? #2f2f2f : #faf7f2; VerticalLayout { ToolItem { symbol: "☷"; label: "目录"; clicked => { catalog-open = !catalog-open; settings-open = false; filters-open = false; } } ToolItem { symbol: "Aa"; label: "设置"; clicked => { settings-clicked(); } } ToolItem { symbol: "⌁"; label: "过滤"; clicked => { filters-clicked(); } } ToolItem { symbol: "⌂"; label: "书架"; clicked => { shelf-clicked(); } } ToolItem { symbol: "↑"; label: "顶部"; clicked => { } } ToolItem { symbol: "↓"; label: "底部"; clicked => { } } } }
+        if toolbar-open: Rectangle { x: parent.width / 2 + read-width * 1px / 2 + 10px; y: parent.height - 112px; width: 42px; height: 96px; background: theme == 6 ? #2f2f2f : #faf7f2; VerticalLayout { ToolItem { width: 42px; symbol: "‹"; label: "上一章"; clicked => { previous-clicked(); } } ToolItem { width: 42px; symbol: "›"; label: "下一章"; clicked => { next-clicked(); } } } }
+        if catalog-open: Rectangle { x: parent.width / 2 - read-width * 1px / 2 - 68px; y: 0px; width: 320px; height: parent.height; background: theme == 6 ? #252525 : #ede7da; border-width: 1px; border-color: theme == 6 ? #555555 : #d8d8d8; VerticalLayout { padding: 18px 0px 24px 25px; spacing: 8px; Text { text: "章节目录"; color: #ed4259; font-size: 18px; font-family: "Microsoft YaHei"; } ScrollView { vertical-stretch: 1; VerticalLayout { for chapter in chapters: Rectangle { height: 40px; Text { text: chapter.title; color: theme == 6 ? #bbbbbb : #333333; font-size: 14px; vertical-alignment: center; overflow: elide; } TouchArea { clicked => { chapter-clicked(chapter.index); catalog-open = false; } } } } } Button { text: "关闭"; clicked => { catalog-open = false; } } } }
+    }
+
+    if settings-open: Rectangle { x: parent.width / 2 - read-width * 1px / 2; y: 0px; width: 310px; height: 560px; background: theme == 6 ? #2c2c2c : #ede7da; border-width: 1px; border-color: theme == 6 ? #555555 : #d8d8d8; VerticalLayout { padding: 18px 22px; spacing: 9px; Text { text: "设置"; color: #ed4259; font-size: 18px; } Text { text: "阅读主题"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } HorizontalLayout { spacing: 6px; Rectangle { width: 25px; height: 25px; border-radius: 13px; background: #f5ead0; border-width: theme == 0 ? 2px : 1px; border-color: theme == 0 ? #ed4259 : rgba(0, 0, 0, 0.18); TouchArea { clicked => { save-settings(0, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 25px; height: 25px; border-radius: 13px; background: #f5ead0; border-width: theme == 1 ? 2px : 1px; border-color: theme == 1 ? #ed4259 : rgba(0, 0, 0, 0.18); TouchArea { clicked => { save-settings(1, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 25px; height: 25px; border-radius: 13px; background: #e6f2e6; border-width: theme == 2 ? 2px : 1px; border-color: theme == 2 ? #ed4259 : rgba(0, 0, 0, 0.18); TouchArea { clicked => { save-settings(2, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 25px; height: 25px; border-radius: 13px; background: #f5ead0; border-width: theme == 3 ? 2px : 1px; border-color: theme == 3 ? #ed4259 : rgba(0, 0, 0, 0.18); TouchArea { clicked => { save-settings(3, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 25px; height: 25px; border-radius: 13px; background: #f1d7d7; border-width: theme == 4 ? 2px : 1px; border-color: theme == 4 ? #ed4259 : rgba(0, 0, 0, 0.18); TouchArea { clicked => { save-settings(4, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 25px; height: 25px; border-radius: 13px; background: #dfe0e0; border-width: theme == 5 ? 2px : 1px; border-color: theme == 5 ? #ed4259 : rgba(0, 0, 0, 0.18); TouchArea { clicked => { save-settings(5, font-size, read-width, line-spacing, paragraph-spacing, font); } } } Rectangle { width: 25px; height: 25px; border-radius: 13px; background: #222222; border-width: theme == 6 ? 2px : 1px; border-color: theme == 6 ? #ed4259 : rgba(0, 0, 0, 0.18); TouchArea { clicked => { save-settings(6, font-size, read-width, line-spacing, paragraph-spacing, font); } } } } Text { text: "正文字体"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } HorizontalLayout { spacing: 5px; Button { text: "宋体"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 0); } } Button { text: "黑体"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 1); } } Button { text: "楷体"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 2); } } Button { text: "苹方"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 3); } } Button { text: "雅黑"; clicked => { save-settings(theme, font-size, read-width, line-spacing, paragraph-spacing, 4); } } } Text { text: "字体大小"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } Stepper { value: font-size + ""; decrement => { save-settings(theme, font-size - 2, read-width, line-spacing, paragraph-spacing, font); } increment => { save-settings(theme, font-size + 2, read-width, line-spacing, paragraph-spacing, font); } } Text { text: "字距"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } Stepper { value: letter-spacing-value + ""; decrement => { save-advanced-settings(letter-spacing-value - 0.01, jump-duration, infinite-loading); } increment => { save-advanced-settings(letter-spacing-value + 0.01, jump-duration, infinite-loading); } } Text { text: "行距 / 段距"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } Stepper { value: line-spacing + " / " + paragraph-spacing; decrement => { save-settings(theme, font-size, read-width, line-spacing - 0.1, paragraph-spacing - 0.1, font); } increment => { save-settings(theme, font-size, read-width, line-spacing + 0.1, paragraph-spacing + 0.1, font); } } Text { text: "页面宽度"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } Stepper { value: read-width + " px"; decrement => { save-settings(theme, font-size, read-width - 160, line-spacing, paragraph-spacing, font); } increment => { save-settings(theme, font-size, read-width + 160, line-spacing, paragraph-spacing, font); } } Text { text: "翻页速度"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } Stepper { value: jump-duration + " ms"; decrement => { save-advanced-settings(letter-spacing-value, jump-duration - 100, infinite-loading); } increment => { save-advanced-settings(letter-spacing-value, jump-duration + 100, infinite-loading); } } HorizontalLayout { spacing: 8px; Text { text: "无限加载"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; vertical-alignment: center; } Button { text: infinite-loading ? "开启" : "关闭"; clicked => { save-advanced-settings(letter-spacing-value, jump-duration, !infinite-loading); } } Rectangle { horizontal-stretch: 1; } Button { text: "关闭"; clicked => { close-panel(); } } } } }
+
+    if filters-open: Rectangle { x: parent.width / 2 - read-width * 1px / 2 + 68px; y: 0px; width: 350px; height: 580px; background: theme == 6 ? #2c2c2c : #ede7da; border-width: 1px; border-color: theme == 6 ? #555555 : #d8d8d8; VerticalLayout { padding: 18px 22px; spacing: 9px; Text { text: "内容过滤"; color: #ed4259; font-size: 18px; } Text { text: "过滤内容"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } TextEdit { height: 64px; text: filter-search; placeholder-text: "输入要过滤的内容"; edited(text) => { filter-search = text; } } Text { text: "替换内容"; color: theme == 6 ? #bbbbbb : #333333; font-size: 12px; } TextEdit { height: 64px; text: filter-replacement; placeholder-text: "留空表示直接删除"; edited(text) => { filter-replacement = text; } } Button { text: "添加规则"; clicked => { add-filter(filter-search, filter-replacement); } } Text { text: "已有规则"; color: theme == 6 ? #bbbbbb : #333333; font-size: 15px; } ScrollView { vertical-stretch: 1; VerticalLayout { for rule in filters: Rectangle { height: 58px; border-width: 1px; border-color: theme == 6 ? #555555 : #e1d9d0; HorizontalLayout { padding: 8px; spacing: 8px; VerticalLayout { horizontal-stretch: 1; Text { text: "过滤：" + rule.search; color: theme == 6 ? #dddddd : #333333; font-size: 12px; overflow: elide; } Text { text: "替换：" + (rule.replacement == "" ? "删除" : rule.replacement); color: theme == 6 ? #aaaaaa : #777777; font-size: 11px; overflow: elide; } } Button { text: "删除"; clicked => { remove-filter(rule.id); } } } } } } Button { text: "关闭"; clicked => { close-panel(); } } } }
 }

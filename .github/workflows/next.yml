@@ -38,12 +38,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
           - os: windows-2022
             target: x86_64-pc-windows-msvc
-          - os: macos-13
-            target: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -56,9 +52,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: next
-      - name: Install Linux UI dependencies
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libgtk-3-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
       - run: cargo build --release --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:

@@ -13,4 +13,4 @@
 
 ## 构建
 
-本地不要求作为验收环境。GitHub Actions 会执行 `cargo fmt --check`、`cargo test`、`cargo clippy`，并在 Windows、macOS、Linux 上构建发布包。
+本地不要求作为验收环境。GitHub Actions 会执行 `cargo fmt --check`、`cargo test`、`cargo clippy`，并暂时只构建 Windows x64 发布包。
