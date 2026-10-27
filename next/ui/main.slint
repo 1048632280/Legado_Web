@@ -345,7 +345,7 @@ export component MainWindow inherits Window {
                                 padding-left: 4px;
                                 Text { text: chapter.title; color: theme == 6 ? #dddddd : #333333; font-size: 14px; vertical-alignment: center; overflow: elide; }
                             }
-                            TouchArea { clicked => { chapter-clicked(chapter.index); catalog-open = false; } }
+                            touch := TouchArea { clicked => { chapter-clicked(chapter.index); catalog-open = false; } }
                         }
                     }
                 }
