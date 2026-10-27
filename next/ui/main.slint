@@ -1,4 +1,4 @@
-import { Button, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+import { Button, LineEdit, ListView, ScrollView, TextEdit } from "std-widgets.slint";
 
 export struct BookItem {
     id: string,
@@ -87,7 +87,7 @@ component CatalogPanel inherits Rectangle {
         spacing: 12px;
         Text { text: "目录"; color: Theme.accent; font-size: 18px; }
         Rectangle { height: 1px; background: root.dark ? #4a4a4a : #ddd6cc; }
-        ScrollView { vertical-stretch: 1; viewport-width: parent.width; viewport-height: root.chapters.length * 40px; VerticalLayout { for chapter in root.chapters: Rectangle { height: 40px; background: catalog-touch.pressed ? (root.dark ? #333333 : #e7e0d5) : transparent; VerticalLayout { padding-left: 4px; Text { text: chapter.title; color: root.dark ? #dddddd : #333333; font-size: 14px; vertical-alignment: center; overflow: elide; } } catalog-touch := TouchArea { clicked => { root.chapter-clicked(chapter.index); } } } } }
+        ListView { vertical-stretch: 1; for chapter in root.chapters: Rectangle { height: 40px; background: catalog-touch.pressed ? (root.dark ? #333333 : #e7e0d5) : transparent; VerticalLayout { padding-left: 4px; Text { text: chapter.title; color: root.dark ? #dddddd : #333333; font-size: 14px; vertical-alignment: center; overflow: elide; } } catalog-touch := TouchArea { clicked => { root.chapter-clicked(chapter.index); } } } }
         Button { text: "关闭"; clicked => { root.close(); } }
     }
 }
@@ -150,8 +150,6 @@ component FilterPanel inherits Rectangle {
         Text { text: "内容过滤"; color: Theme.accent; font-size: 18px; }
         Rectangle { height: 1px; background: root.dark ? #555555 : #e2d9d4; }
         ScrollView {
-            viewport-width: parent.width;
-            viewport-height: 420px + root.filters.length * 58px;
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 10px;
@@ -174,8 +172,6 @@ export component MainWindow inherits Window {
     title: "阅读";
     width: 1240px;
     height: 800px;
-    min-width: 980px;
-    min-height: 620px;
     background: Theme.shell-background;
     in property <int> page: 0;
     in-out property <bool> catalog-open: false;
@@ -269,8 +265,7 @@ export component MainWindow inherits Window {
                     HorizontalLayout { height: 30px; Text { text: "我的书架"; color: Theme.text; font-size: 21px; font-weight: 700; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } Text { text: root.status; color: #727982; font-size: 12px; vertical-alignment: center; overflow: elide; } }
                     if root.books.length == 0 && root.search-text == "": Rectangle { vertical-stretch: 1; border-width: 1px; border-color: #d9dadd; border-radius: 8px; background: #fbfbfc; VerticalLayout { alignment: center; spacing: 12px; Text { text: "导入 TXT 开始阅读"; color: Theme.text; font-size: 22px; font-weight: 700; horizontal-alignment: center; } Text { text: "选择本地 TXT 文件，或直接拖拽到书架区域导入。"; color: Theme.muted; font-size: 14px; horizontal-alignment: center; } Rectangle { height: 4px; } Button { text: "导入 TXT"; clicked => { root.import-clicked(); } } } }
                     if root.books.length == 0 && root.search-text != "": Rectangle { vertical-stretch: 1; border-width: 1px; border-color: #d9dadd; border-radius: 8px; background: #fbfbfc; VerticalLayout { alignment: center; spacing: 8px; Text { text: "没有找到匹配的书籍"; color: Theme.text; font-size: 20px; font-weight: 700; horizontal-alignment: center; } Text { text: "请尝试其他书名或作者关键词。"; color: Theme.muted; font-size: 14px; horizontal-alignment: center; } } }
-                    if root.books.length > 0 && width >= 1100px: ScrollView { vertical-stretch: 1; viewport-width: parent.width; viewport-height: ((root.books.length + 1) / 2) * 160px; GridLayout { spacing: 16px; for book in root.books: BookCard { row: book.index / 2; col: Math.mod(book.index, 2); width: 340px; book: book; open(id) => { root.book-clicked(id); } remove(id) => { root.book-delete(id); } } } }
-                    if root.books.length > 0 && width < 1100px: ScrollView { vertical-stretch: 1; viewport-width: parent.width; viewport-height: root.books.length * 156px; VerticalLayout { spacing: 12px; for book in root.books: BookCard { width: parent.width; book: book; open(id) => { root.book-clicked(id); } remove(id) => { root.book-delete(id); } } } }
+                    if root.books.length > 0: ListView { vertical-stretch: 1; for book in root.books: BookCard { width: parent.width; book: book; open(id) => { root.book-clicked(id); } remove(id) => { root.book-delete(id); } } }
                 }
             }
         }
@@ -290,8 +285,8 @@ export component MainWindow inherits Window {
                 ReaderTool { label: "过滤"; icon: @image-url("icons/filter.svg"); dark: root.theme == 6; clicked => { root.filters-clicked(); } }
                 ReaderTool { label: "书架"; icon: @image-url("icons/shelf.svg"); dark: root.theme == 6; clicked => { root.shelf-clicked(); } }
                 Rectangle { vertical-stretch: 1; }
-                ReaderTool { label: "顶部"; icon: @image-url("icons/arrow-up.svg"); dark: root.theme == 6; clicked => { reader-scroll.viewport-y = 0px; } }
-                ReaderTool { label: "底部"; icon: @image-url("icons/arrow-down.svg"); dark: root.theme == 6; clicked => { reader-scroll.viewport-y = reader-scroll.visible-height - reader-scroll.viewport-height; } }
+                ReaderTool { label: "顶部"; icon: @image-url("icons/arrow-up.svg"); dark: root.theme == 6; clicked => { reader-scroll.content-y = 0px; } }
+                ReaderTool { label: "底部"; icon: @image-url("icons/arrow-down.svg"); dark: root.theme == 6; clicked => { reader-scroll.content-y = reader-scroll.visible-height - reader-scroll.content-height; } }
             }
             Rectangle { horizontal-stretch: 1; }
             Rectangle { horizontal-stretch: 4; max-width: root.read-width * 1px; min-width: 320px; background: theme == 6 ? #202020 : (theme == 4 ? #f5e4e4 : #ede7da); border-width: 1px; border-color: theme == 6 ? #444444 : #d8d8d8; reader-scroll := ScrollView { vertical-stretch: 1; horizontal-stretch: 1; VerticalLayout { width: parent.width; padding-left: 65px; padding-right: 65px; spacing: 12px; Rectangle { height: 64px; } Text { text: root.selected-chapter-title; width: parent.width; color: root.theme == 6 ? #eeeeee : #262626; font-size: (root.font-size + 6) * 1px; font-family: "Microsoft YaHei"; wrap: word-wrap; } Text { text: root.selected-book-author; width: parent.width; color: root.theme == 6 ? #aaaaaa : #8b7d72; font-size: 12px; } Rectangle { height: 8px; } Text { text: root.chapter-content; width: parent.width; color: root.theme == 6 ? #dedede : #262626; font-size: root.font-size * 1px; font-family: root.font == 0 ? "SimSun" : (root.font == 1 ? "SimHei" : (root.font == 2 ? "KaiTi" : "Microsoft YaHei")); wrap: word-wrap; } Rectangle { height: 64px; } } } }
