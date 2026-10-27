@@ -222,9 +222,9 @@ export component MainWindow inherits Window {
                                 width: 340px;
                                 height: 144px;
                                 border-width: 1px;
-                                border-color: touch.has-hover ? #c9d9ec : #e4e5e7;
+                                border-color: touch-card.has-hover ? #c9d9ec : #e4e5e7;
                                 border-radius: 8px;
-                                background: touch.pressed ? #f6f9fc : #ffffff;
+                                background: touch-card.pressed ? #f6f9fc : #ffffff;
                                 HorizontalLayout {
                                     padding: 16px;
                                     spacing: 16px;
@@ -253,7 +253,7 @@ export component MainWindow inherits Window {
                                         Button { text: "删除"; width: 48px; height: 26px; clicked => { book-delete(book.id); } }
                                     }
                                 }
-                                touch := TouchArea { clicked => { book-clicked(book.id); } }
+                                touch-card := TouchArea { clicked => { book-clicked(book.id); } }
                             }
                         }
                     }
@@ -340,12 +340,12 @@ export component MainWindow inherits Window {
                         for chapter in chapters: Rectangle {
                             height: 40px;
                             border-width: 0px;
-                            background: touch.pressed ? (theme == 6 ? #333333 : #e7e0d5) : transparent;
+                            background: touch-catalog.pressed ? (theme == 6 ? #333333 : #e7e0d5) : transparent;
                             VerticalLayout {
                                 padding-left: 4px;
                                 Text { text: chapter.title; color: theme == 6 ? #dddddd : #333333; font-size: 14px; vertical-alignment: center; overflow: elide; }
                             }
-                            touch := TouchArea { clicked => { chapter-clicked(chapter.index); catalog-open = false; } }
+                            touch-catalog := TouchArea { clicked => { chapter-clicked(chapter.index); catalog-open = false; } }
                         }
                     }
                 }
