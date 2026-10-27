@@ -6,7 +6,7 @@ use directories::ProjectDirs;
 use encoding_rs::GB18030;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use slint::{ModelRc, VecModel};
+use slint::{Model, ModelRc, VecModel};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -243,7 +243,7 @@ fn save_settings(conn: &Connection, value: &Settings) -> Result<()> {
 }
 fn filters(conn: &Connection, book: &str) -> Result<Vec<FilterItem>> {
     let mut stmt = conn.prepare("SELECT id,search,replacement FROM filters WHERE book_id=?")?;
-    Ok(stmt
+    let items = stmt
         .query_map([book], |r| {
             Ok(FilterItem {
                 id: r.get(0)?,
@@ -251,7 +251,8 @@ fn filters(conn: &Connection, book: &str) -> Result<Vec<FilterItem>> {
                 replacement: r.get::<_, String>(2)?.into(),
             })
         })?
-        .collect::<rusqlite::Result<Vec<_>>>()?)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(items)
 }
 
 fn show_book(ui: &MainWindow, state: &AppState, id: &str) -> Result<()> {
@@ -272,6 +273,7 @@ fn show_book(ui: &MainWindow, state: &AppState, id: &str) -> Result<()> {
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
     state.current_book.lock().unwrap().replace(id.to_string());
     *state.current_chapter.lock().unwrap() = current;
     let filter_items = filters(&conn, id)?;
@@ -334,7 +336,7 @@ fn import_paths(ui: &MainWindow, state: &AppState, paths: Vec<std::path::PathBuf
     if paths.is_empty() {
         return Ok(());
     }
-    let mut conn = state.db.lock().unwrap();
+    let conn = state.db.lock().unwrap();
     let now = Utc::now().timestamp();
     let mut imported = 0;
     for path in paths {
@@ -368,13 +370,14 @@ fn import_paths(ui: &MainWindow, state: &AppState, paths: Vec<std::path::PathBuf
 fn main() -> Result<()> {
     let ui = MainWindow::new()?;
     ui.on_transfer_to_paths(|transfer| {
-        transfer
+        let paths = transfer
             .file_paths()
             .ok()
             .into_iter()
             .flatten()
             .map(|path| path.to_string_lossy().to_string().into())
-            .collect()
+            .collect::<Vec<_>>();
+        ModelRc::new(VecModel::from(paths))
     });
     let conn = open_db()?;
     let state = AppState {
