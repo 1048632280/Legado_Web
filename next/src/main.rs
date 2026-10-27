@@ -168,9 +168,7 @@ fn split_chapters(text: &str) -> Vec<(String, String)> {
 }
 
 fn book_id(path: &Path) -> String {
-    let stable = path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf());
+    let stable = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     format!("local://{}", stable.to_string_lossy())
 }
 
