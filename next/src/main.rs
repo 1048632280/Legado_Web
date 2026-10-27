@@ -105,7 +105,8 @@ fn split_chapters(text: &str) -> Vec<(String, String)> {
     let titles: Vec<(usize, String)> = lines
         .iter()
         .enumerate()
-        .filter_map(|(i, line)| chapter_line(line).then(|| (i, line.trim().to_string())))
+        .filter(|&(_, line)| chapter_line(line))
+        .map(|(i, line)| (i, line.trim().to_string()))
         .collect();
     if titles.len() < 2 {
         let paragraphs: Vec<&str> = text
