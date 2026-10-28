@@ -8,7 +8,6 @@ export const DEFAULT_READ_CONFIG: webReadConfig = {
   readWidth: 800,
   infiniteLoading: false,
   jumpDuration: 1000,
-  autoReadSpeed: 30,
   spacing: {
     paragraph: 1,
     line: 0.8,
@@ -67,9 +66,6 @@ export const normalizeReadConfig = (value: unknown): webReadConfig => {
 
   const jumpDuration = integerInRange(value.jumpDuration, 0, 10000)
   if (jumpDuration !== undefined) config.jumpDuration = jumpDuration
-
-  const autoReadSpeed = integerInRange(value.autoReadSpeed, 5, 300)
-  if (autoReadSpeed !== undefined) config.autoReadSpeed = autoReadSpeed
 
   if (typeof value.infiniteLoading === 'boolean') {
     config.infiniteLoading = value.infiniteLoading

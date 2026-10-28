@@ -5,7 +5,6 @@ export type webReadConfig = {
   readWidth: number
   infiniteLoading: boolean
   jumpDuration: number
-  autoReadSpeed: number
   spacing: {
     paragraph: number
     line: number
