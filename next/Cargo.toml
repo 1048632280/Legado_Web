@@ -1,25 +1,22 @@
 [package]
-name = "legado-next"
+name = "legado-core"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.77"
-description = "A lightweight offline TXT reader built with Rust and Slint"
+description = "A lightweight offline TXT reader core for the Flutter desktop client"
 license = "MIT"
-build = "build.rs"
 
 [dependencies]
 anyhow = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 directories = "5.0"
 encoding_rs = "0.8"
-rfd = "0.15"
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-slint = "1.9"
 
-[build-dependencies]
-slint-build = "1.9"
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 codegen-units = 1
