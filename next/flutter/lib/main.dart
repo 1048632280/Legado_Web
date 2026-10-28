@@ -319,7 +319,47 @@ class _BookCardState extends State<BookCard> {
   bool hovered = false;
 
   @override
-  Widget build(BuildContext context) => MouseRegion(onEnter: (_) => setState(() => hovered = true), onExit: (_) => setState(() => hovered = false), child: AnimatedContainer(duration: const Duration(milliseconds: 200), transform: hovered ? (Matrix4.identity()..translate(0.0, -2.0)) : Matrix4.identity(), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: hovered ? const Color(0xFFBFD5EC) : Theme.of(context).dividerColor), boxShadow: hovered ? const [BoxShadow(color: Color(0x140F172A), blurRadius: 18, offset: Offset(0, 8))] : const []), child: InkWell(onTap: widget.onOpen, borderRadius: BorderRadius.circular(14), child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [BookCover(title: widget.book.title), const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.book.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)), const SizedBox(height: 8), Text('${widget.book.author} · 共 ${widget.book.chapters} 章', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: _muted)), const SizedBox(height: 5), Text('已读：${widget.book.progress}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: _muted)), const Spacer(), Align(alignment: Alignment.bottomLeft, child: TextButton.icon(onPressed: widget.onDelete, icon: const Icon(Icons.delete_outline, size: 17), label: const Text('删除'))]))]))));
+  Widget build(BuildContext context) => MouseRegion(
+        onEnter: (_) => setState(() => hovered = true),
+        onExit: (_) => setState(() => hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          transform: hovered ? (Matrix4.identity()..translate(0.0, -2.0)) : Matrix4.identity(),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: hovered ? const Color(0xFFBFD5EC) : Theme.of(context).dividerColor),
+            boxShadow: hovered ? const [BoxShadow(color: Color(0x140F172A), blurRadius: 18, offset: Offset(0, 8))] : const [],
+          ),
+          child: InkWell(
+            onTap: widget.onOpen,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  BookCover(title: widget.book.title),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.book.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        Text('${widget.book.author} · 共 ${widget.book.chapters} 章', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: _muted)),
+                        const SizedBox(height: 5),
+                        Text('已读：${widget.book.progress}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: _muted)),
+                        const Spacer(),
+                        Align(alignment: Alignment.bottomLeft, child: TextButton.icon(onPressed: widget.onDelete, icon: const Icon(Icons.delete_outline, size: 17), label: const Text('删除'))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class BookCover extends StatelessWidget {
@@ -460,7 +500,47 @@ class _ReaderPageState extends State<ReaderPage> {
       };
 
   Future<void> _catalog(BuildContext context) async {
-    await showGeneralDialog<void>(context: context, barrierLabel: '目录', barrierDismissible: true, barrierColor: Colors.black.withOpacity(.18), transitionDuration: const Duration(milliseconds: 240), pageBuilder: (context, _, __) => Align(alignment: Alignment.centerLeft, child: Material(child: SizedBox(width: 340, height: double.infinity, child: Padding(padding: const EdgeInsets.fromLTRB(24, 28, 18, 24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('目录', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: _accent)), const SizedBox(height: 16), Expanded(child: ListView.separated(itemCount: book.chapters.length, separatorBuilder: (_, __) => const Divider(height: 1), itemBuilder: (context, index) => ListTile(contentPadding: EdgeInsets.zero, title: Text(book.chapters[index].title, maxLines: 1, overflow: TextOverflow.ellipsis), selected: book.chapters[index].index == book.current, onTap: () { Navigator.pop(context); widget.controller.loadChapter(book.chapters[index].index); })))]))));
+    await showGeneralDialog<void>(
+      context: context,
+      barrierLabel: '目录',
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(.18),
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (context, _, __) => Align(
+        alignment: Alignment.centerLeft,
+        child: Material(
+          child: SizedBox(
+            width: 340,
+            height: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 18, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('目录', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: _accent)),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: book.chapters.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(book.chapters[index].title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        selected: book.chapters[index].index == book.current,
+                        onTap: () {
+                          Navigator.pop(context);
+                          widget.controller.loadChapter(book.chapters[index].index);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _settings(BuildContext context) async {
@@ -508,7 +588,72 @@ class _SettingsDialogState extends State<SettingsDialog> {
   late ReaderSettings value = widget.settings;
 
   @override
-  Widget build(BuildContext context) => AlertDialog(title: const Text('阅读设置'), content: SizedBox(width: 460, child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('阅读主题', style: Theme.of(context).textTheme.labelLarge), const SizedBox(height: 10), Wrap(spacing: 10, children: List.generate(7, (index) => InkWell(onTap: () => setState(() => value = value.copyWith(theme: index)), borderRadius: BorderRadius.circular(18), child: Container(width: 28, height: 28, decoration: BoxDecoration(color: _themeColor(index), shape: BoxShape.circle, border: Border.all(color: value.theme == index ? _accent : Colors.black26, width: value.theme == index ? 3 : 1))))), const SizedBox(height: 20), DropdownButtonFormField<int>(value: value.font, decoration: const InputDecoration(labelText: '正文字体'), items: const [DropdownMenuItem(value: 0, child: Text('宋体')), DropdownMenuItem(value: 1, child: Text('黑体')), DropdownMenuItem(value: 2, child: Text('楷体')), DropdownMenuItem(value: 4, child: Text('微软雅黑'))], onChanged: (font) => setState(() => value = value.copyWith(font: font))), const SizedBox(height: 14), _slider('字体大小', value.fontSize.toDouble(), 12, 48, (v) => value = value.copyWith(fontSize: v.round())), _slider('阅读宽度', value.readWidth.toDouble(), 620, 1100, (v) => value = value.copyWith(readWidth: v.round())), _slider('字距', value.letterSpacing, 0, 2, (v) => value = value.copyWith(letterSpacing: v)), _slider('行距', value.lineSpacing, .2, 2, (v) => value = value.copyWith(lineSpacing: v)), _slider('段距', value.paragraphSpacing, 0, 4, (v) => value = value.copyWith(paragraphSpacing: v)), _slider('翻页速度', value.jumpDuration.toDouble(), 0, 10000, (v) => value = value.copyWith(jumpDuration: v.round())), SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('无限加载'), subtitle: const Text('阅读接近末尾时预加载下一章'), value: value.infiniteLoading, onChanged: (enabled) => setState(() => value = value.copyWith(infiniteLoading: enabled)))]))), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')), FilledButton(onPressed: () => Navigator.pop(context, value), child: const Text('保存'))]);
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('阅读设置'),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('阅读主题', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                children: List.generate(
+                  7,
+                  (index) => InkWell(
+                    onTap: () => setState(() => value = value.copyWith(theme: index)),
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _themeColor(index),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: value.theme == index ? _accent : Colors.black26, width: value.theme == index ? 3 : 1),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              DropdownButtonFormField<int>(
+                value: value.font,
+                decoration: const InputDecoration(labelText: '正文字体'),
+                items: const [
+                  DropdownMenuItem(value: 0, child: Text('宋体')),
+                  DropdownMenuItem(value: 1, child: Text('黑体')),
+                  DropdownMenuItem(value: 2, child: Text('楷体')),
+                  DropdownMenuItem(value: 4, child: Text('微软雅黑')),
+                ],
+                onChanged: (font) => setState(() => value = value.copyWith(font: font)),
+              ),
+              const SizedBox(height: 14),
+              _slider('字体大小', value.fontSize.toDouble(), 12, 48, (v) => value = value.copyWith(fontSize: v.round())),
+              _slider('阅读宽度', value.readWidth.toDouble(), 620, 1100, (v) => value = value.copyWith(readWidth: v.round())),
+              _slider('字距', value.letterSpacing, 0, 2, (v) => value = value.copyWith(letterSpacing: v)),
+              _slider('行距', value.lineSpacing, .2, 2, (v) => value = value.copyWith(lineSpacing: v)),
+              _slider('段距', value.paragraphSpacing, 0, 4, (v) => value = value.copyWith(paragraphSpacing: v)),
+              _slider('翻页速度', value.jumpDuration.toDouble(), 0, 10000, (v) => value = value.copyWith(jumpDuration: v.round())),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('无限加载'),
+                subtitle: const Text('阅读接近末尾时预加载下一章'),
+                value: value.infiniteLoading,
+                onChanged: (enabled) => setState(() => value = value.copyWith(infiniteLoading: enabled)),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        FilledButton(onPressed: () => Navigator.pop(context, value), child: const Text('保存')),
+      ],
+    );
+  }
 
   Widget _slider(String label, double current, double min, double max, ValueChanged<double> onChanged) => StatefulBuilder(builder: (context, setLocal) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(label), const Spacer(), Text(current.toStringAsFixed(label == '字体大小' || label == '阅读宽度' ? 0 : 1), style: const TextStyle(color: _muted))]), Slider(value: current.clamp(min, max), min: min, max: max, onChanged: (v) { onChanged(v); setLocal(() {}); setState(() {}); })]));
 
@@ -531,8 +676,69 @@ class _FiltersDialogState extends State<FiltersDialog> {
   late List<FilterRule> rules = List<FilterRule>.of(widget.book.filters);
 
   @override
-  void dispose() { search.dispose(); replacement.dispose(); super.dispose(); }
+  void dispose() {
+    search.dispose();
+    replacement.dispose();
+    super.dispose();
+  }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(title: const Text('内容过滤'), content: SizedBox(width: 500, child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [TextField(controller: search, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: '过滤内容')), const SizedBox(height: 12), TextField(controller: replacement, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: '替换内容', helperText: '留空表示直接删除')), const SizedBox(height: 18), Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: () async { final updated = await widget.onAdd(search.text, replacement.text); if (mounted) setState(() { if (updated != null) rules = updated.filters; search.clear(); replacement.clear(); }); }, icon: const Icon(Icons.add), label: const Text('添加规则'))), const Divider(height: 28), Text('已有规则', style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 8), if (rules.isEmpty) const Text('暂无过滤规则', style: TextStyle(color: _muted)) else ...rules.map((rule) => ListTile(contentPadding: EdgeInsets.zero, title: Text('过滤：${rule.search}'), subtitle: Text('替换：${rule.replacement.isEmpty ? '删除' : rule.replacement}'), trailing: IconButton(tooltip: '删除规则', onPressed: () async { final updated = await widget.onDelete(rule.id); if (mounted && updated != null) setState(() => rules = updated.filters); }, icon: const Icon(Icons.delete_outline))))]))), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭'))]);
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('内容过滤'),
+      content: SizedBox(
+        width: 500,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(controller: search, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: '过滤内容')),
+              const SizedBox(height: 12),
+              TextField(controller: replacement, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: '替换内容', helperText: '留空表示直接删除')),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    final updated = await widget.onAdd(search.text, replacement.text);
+                    if (mounted) {
+                      setState(() {
+                        if (updated != null) rules = updated.filters;
+                        search.clear();
+                        replacement.clear();
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('添加规则'),
+                ),
+              ),
+              const Divider(height: 28),
+              Text('已有规则', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              if (rules.isEmpty)
+                const Text('暂无过滤规则', style: TextStyle(color: _muted))
+              else
+                ...rules.map(
+                  (rule) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('过滤：${rule.search}'),
+                    subtitle: Text('替换：${rule.replacement.isEmpty ? '删除' : rule.replacement}'),
+                    trailing: IconButton(
+                      tooltip: '删除规则',
+                      onPressed: () async {
+                        final updated = await widget.onDelete(rule.id);
+                        if (mounted && updated != null) setState(() => rules = updated.filters);
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭'))],
+    );
+  }
 }
