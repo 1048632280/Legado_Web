@@ -447,7 +447,9 @@ class _ReaderPageState extends State<ReaderPage> {
 
   @override
   void dispose() {
-    if (scrollController.hasClients) unawaited(widget.controller.saveProgress(scrollController.offset.round()));
+    if (scrollController.hasClients) {
+      unawaited(widget.controller.saveProgress(scrollController.offset.round()));
+    }
     scrollController.removeListener(_onScroll);
     scrollController.dispose();
     super.dispose();
