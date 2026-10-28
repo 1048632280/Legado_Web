@@ -258,7 +258,24 @@ class ShelfSidebar extends StatelessWidget {
           const SizedBox(height: 28),
           Text('最近阅读', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: _muted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
-          Semantics(button: true, label: recent == null ? '暂无阅读记录' : '继续阅读 ${recent.title}', child: InkWell(onTap: recent == null ? null : () => controller.openBook(recent), borderRadius: BorderRadius.circular(10), child: AnimatedContainer(duration: const Duration(milliseconds: 180), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: recent == null ? Theme.of(context).colorScheme.surfaceContainerHighest : const Color(0xFFF0F6FC), border: Border.all(color: recent == null ? Theme.of(context).dividerColor : const Color(0xFFC9D9EC)), borderRadius: BorderRadius.circular(10)), child: Text(recent?.title ?? '暂无阅读记录', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: recent == null ? _muted : const Color(0xFF3975B5))))),
+          Semantics(
+            button: true,
+            label: recent == null ? '暂无阅读记录' : '继续阅读 ${recent.title}',
+            child: InkWell(
+              onTap: recent == null ? null : () => controller.openBook(recent),
+              borderRadius: BorderRadius.circular(10),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: recent == null ? Theme.of(context).colorScheme.surfaceContainerHighest : const Color(0xFFF0F6FC),
+                  border: Border.all(color: recent == null ? Theme.of(context).dividerColor : const Color(0xFFC9D9EC)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(recent?.title ?? '暂无阅读记录', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: recent == null ? _muted : const Color(0xFF3975B5))),
+              ),
+            ),
+          ),
           const SizedBox(height: 28),
           Text('本地数据', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: _muted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
@@ -302,7 +319,36 @@ class EmptyShelf extends StatelessWidget {
   final Future<void> Function() onImport;
 
   @override
-  Widget build(BuildContext context) => Center(child: Container(width: double.infinity, constraints: const BoxConstraints(maxWidth: 720), padding: const EdgeInsets.all(48), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface.withOpacity(.8), border: Border.all(color: Theme.of(context).dividerColor), borderRadius: BorderRadius.circular(18)), child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(searching ? Icons.search_off_rounded : Icons.auto_stories_rounded, size: 44, color: _accent), const SizedBox(height: 16), Text(searching ? '没有找到匹配的书籍' : '导入 TXT 开始阅读', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)), const SizedBox(height: 8), Text(searching ? '请尝试其他书名或作者关键词。' : '选择本地 TXT 文件，导入后即可离线阅读。', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: _muted)), if (!searching) ...[const SizedBox(height: 24), FilledButton.icon(onPressed: onImport, icon: const Icon(Icons.file_open_outlined), label: const Text('导入 TXT'))]]));
+  Widget build(BuildContext context) => Center(
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 720),
+          padding: const EdgeInsets.all(48),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface.withOpacity(.8),
+            border: Border.all(color: Theme.of(context).dividerColor),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(searching ? Icons.search_off_rounded : Icons.auto_stories_rounded, size: 44, color: _accent),
+              const SizedBox(height: 16),
+              Text(searching ? '没有找到匹配的书籍' : '导入 TXT 开始阅读', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(
+                searching ? '请尝试其他书名或作者关键词。' : '选择本地 TXT 文件，导入后即可离线阅读。',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: _muted),
+              ),
+              if (!searching) ...[
+                const SizedBox(height: 24),
+                FilledButton.icon(onPressed: onImport, icon: const Icon(Icons.file_open_outlined), label: const Text('导入 TXT')),
+              ],
+            ],
+          ),
+        ),
+      );
 }
 
 class BookCard extends StatefulWidget {
