@@ -1,0 +1,70 @@
+name: Build Windows Clients
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'next/**'
+      - '.github/workflows/next.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-clients:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> src-tauri/target
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build portable executable
+        run: pnpm exec tauri build --ci --no-bundle
+
+      - name: Stage portable executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/portable | Out-Null
+          Copy-Item src-tauri/target/release/legado-local-reader.exe artifacts/portable/Legado-Local-Reader-Portable.exe
+
+      - name: Build installer
+        run: pnpm exec tauri build --ci
+
+      - name: Stage installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/installer | Out-Null
+          $installers = Get-ChildItem src-tauri/target/release/bundle/nsis -Filter '*-setup.exe'
+          if ($installers.Count -ne 1) { throw "Expected one NSIS installer, found $($installers.Count)" }
+          Copy-Item $installers[0].FullName artifacts/installer/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legado-windows-portable-x64
+          path: artifacts/portable/Legado-Local-Reader-Portable.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legado-windows-installer-x64
+          path: artifacts/installer/*-setup.exe
+          if-no-files-found: error

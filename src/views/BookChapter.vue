@@ -83,6 +83,18 @@
     </div>
     <div class="read-bar" :style="rightBarTheme">
       <div class="tools">
+        <button
+          class="tool-icon auto-read-toggle"
+          type="button"
+          :aria-label="autoReading ? '暂停自动阅读' : '开始自动阅读'"
+          :aria-pressed="autoReading"
+          @click.stop="toggleAutoRead"
+        >
+          <el-icon class="auto-read-icon">
+            <component :is="autoReading ? VideoPause : VideoPlay" />
+          </el-icon>
+          <span v-if="miniInterface">{{ autoReading ? '暂停' : '自动阅读' }}</span>
+        </button>
         <div
           class="tool-icon"
           :class="{ 'no-point': noPoint }"
@@ -139,7 +151,7 @@ import { useContentFilters } from '@/hooks/useContentFilters'
 import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
 import { applyContentFilters } from '@/utils/contentFilter'
-import { Filter } from '@element-plus/icons-vue'
+import { Filter, VideoPause, VideoPlay } from '@element-plus/icons-vue'
 
 const content = ref()
 // loading spinner
@@ -218,6 +230,7 @@ watchEffect(() => {
   }
 })
 const loadMore = () => {
+  if (isLoading.value) return
   const latestChapter = chapterData.value[chapterData.value.length - 1]
   if (latestChapter === undefined) return
   const index = latestChapter.index
@@ -501,6 +514,75 @@ const onReadLengthChange = (index: number, pos: number) => {
   saveBookProgressThrottle()
 }
 
+const autoReading = ref(false)
+let autoReadFrame: number | undefined
+let previousAutoReadFrameTime: number | undefined
+let autoReadTarget = 0
+const stopAutoReadFrame = () => {
+  if (autoReadFrame !== undefined) cancelAnimationFrame(autoReadFrame)
+  autoReadFrame = undefined
+  previousAutoReadFrameTime = undefined
+}
+const stopAutoRead = () => {
+  autoReading.value = false
+  stopAutoReadFrame()
+}
+const runAutoReadFrame = (time: number) => {
+  autoReadFrame = undefined
+  if (!autoReading.value || document.visibilityState === 'hidden') return
+
+  if (previousAutoReadFrameTime !== undefined) {
+    const elapsed = Math.min(time - previousAutoReadFrameTime, 50)
+    const actualScroll = window.scrollY
+    if (Math.abs(actualScroll - autoReadTarget) > 2) {
+      autoReadTarget = actualScroll
+    }
+    autoReadTarget += (store.config.autoReadSpeed * elapsed) / 1000
+    window.scrollTo({ left: 0, top: autoReadTarget, behavior: 'instant' })
+  }
+  previousAutoReadFrameTime = time
+
+  const documentElement = document.documentElement
+  const atBottom =
+    documentElement.scrollTop + documentElement.clientHeight >=
+    documentElement.scrollHeight - 2
+  if (atBottom && !isLoading.value) {
+    const latestChapter = chapterData.value[chapterData.value.length - 1]
+    const nextChapterIndex = (latestChapter?.index ?? chapterIndex.value) + 1
+    if (catalog.value[nextChapterIndex] !== undefined) {
+      loadMore()
+    } else if (latestChapter?.index === catalog.value.length - 1) {
+      stopAutoRead()
+      return
+    }
+  }
+
+  autoReadFrame = requestAnimationFrame(runAutoReadFrame)
+}
+const startAutoReadFrame = () => {
+  if (!autoReading.value || document.visibilityState === 'hidden') return
+  if (autoReadFrame === undefined) {
+    autoReadTarget = window.scrollY
+    previousAutoReadFrameTime = undefined
+    autoReadFrame = requestAnimationFrame(runAutoReadFrame)
+  }
+}
+const toggleAutoRead = () => {
+  if (autoReading.value) {
+    stopAutoRead()
+    return
+  }
+  autoReading.value = true
+  startAutoReadFrame()
+}
+const onAutoReadVisibilityChange = () => {
+  if (document.visibilityState === 'hidden') {
+    stopAutoReadFrame()
+    return
+  }
+  startAutoReadFrame()
+}
+
 // 文档标题
 watchEffect(() => {
   document.title = catalog.value[chapterIndex.value]?.title || document.title
@@ -672,6 +754,7 @@ onMounted(async () => {
         window.addEventListener('keydown', ignoreKeyPress)
         // 兼容Safari < 14
         document.addEventListener('visibilitychange', onVisibilityChange)
+        document.addEventListener('visibilitychange', onAutoReadVisibilityChange)
         //监听底部加载
         scrollObserver = new IntersectionObserver(onReachBottom, {
           rootMargin: '-100% 0% 20% 0%',
@@ -697,6 +780,8 @@ onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   // 兼容Safari < 14
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  document.removeEventListener('visibilitychange', onAutoReadVisibilityChange)
+  stopAutoRead()
   readSettingsVisible.value = false
   popCataVisible.value = false
   scrollObserver?.disconnect()
@@ -807,6 +892,29 @@ onBeforeRouteLeave((to, from, next) => {
           height: 16px;
           font-size: 16px;
           margin: 0 auto 6px;
+        }
+
+        &.auto-read-toggle {
+          display: block;
+          box-sizing: content-box;
+          border: 0;
+          background: transparent;
+          color: inherit;
+          font-family: inherit;
+          line-height: normal;
+        }
+
+        &.auto-read-toggle:focus-visible {
+          outline: 2px solid #ed4259;
+          outline-offset: 2px;
+        }
+
+        .auto-read-icon {
+          display: block;
+          width: 16px;
+          height: 16px;
+          margin: 0 auto 6px;
+          font-size: 16px;
         }
       }
     }
@@ -922,6 +1030,17 @@ onBeforeRouteLeave((to, from, next) => {
 
           .iconfont {
             display: inline-block;
+          }
+        }
+
+        .tool-icon.auto-read-toggle {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding-top: 12px;
+
+          .auto-read-icon {
+            margin: 0;
           }
         }
       }
