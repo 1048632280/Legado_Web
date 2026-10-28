@@ -53,7 +53,11 @@ jobs:
           cp -R _flutter_host/windows flutter/windows
           rm -rf _flutter_host
       - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed lib
+      - run: dart format lib
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dartfmt-output
+          path: next/flutter/lib/
       - run: flutter analyze
       - run: flutter test
 

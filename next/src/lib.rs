@@ -329,6 +329,10 @@ fn command(request: &Value) -> Result<Value> {
 }
 
 #[no_mangle]
+/// Execute a JSON command against the local reader core.
+///
+/// # Safety
+/// `request` must be null or point to a valid NUL-terminated C string for the duration of this call.
 pub unsafe extern "C" fn legado_command(request: *const c_char) -> *mut c_char {
     let response = if request.is_null() {
         json!({"ok": false, "error": "请求为空"})
@@ -342,6 +346,10 @@ pub unsafe extern "C" fn legado_command(request: *const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
+/// Release a string allocated by [`legado_command`].
+///
+/// # Safety
+/// `value` must be null or a pointer previously returned by [`legado_command`] that has not been freed.
 pub unsafe extern "C" fn legado_free(value: *mut c_char) {
     if !value.is_null() { drop(CString::from_raw(value)); }
 }
