@@ -77,7 +77,9 @@ class AppController extends ChangeNotifier {
 
   Future<void> loadChapter(int index) async {
     final current = reader;
-    if (current == null || index < 0 || index >= current.chapters.length) return;
+    if (current == null || index < 0 || index >= current.chapters.length) {
+      return;
+    }
     await _run(() async {
       final data = api.call({'op': 'chapter', 'id': current.id, 'index': index});
       reader = ReaderBook(id: current.id, title: current.title, author: current.author, current: index, position: 0, chapters: current.chapters, filters: current.filters, chapterTitle: data['title'] as String, content: data['content'] as String);
@@ -88,7 +90,9 @@ class AppController extends ChangeNotifier {
   Future<void> deleteBook(Book book) async {
     await _run(() async {
       api.call({'op': 'delete_book', 'id': book.id});
-      if (reader?.id == book.id) reader = null;
+      if (reader?.id == book.id) {
+        reader = null;
+      }
       status = '已删除《${book.title}》';
       await reloadBooks();
     });
@@ -325,7 +329,7 @@ class EmptyShelf extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 720),
           padding: const EdgeInsets.all(48),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withOpacity(.8),
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: .8),
             border: Border.all(color: Theme.of(context).dividerColor),
             borderRadius: BorderRadius.circular(18),
           ),
@@ -370,7 +374,9 @@ class _BookCardState extends State<BookCard> {
         onExit: (_) => setState(() => hovered = false),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          transform: hovered ? (Matrix4.identity()..translate(0.0, -2.0)) : Matrix4.identity(),
+          transform: hovered
+              ? (Matrix4.identity()..translateByDouble(0.0, -2.0, 0.0, 1.0))
+              : Matrix4.identity(),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(14),
@@ -448,12 +454,21 @@ class _ReaderPageState extends State<ReaderPage> {
   }
 
   void _onScroll() {
-    if (!settings.infiniteLoading || loadingNext || !scrollController.hasClients) return;
-    if (scrollController.position.extentAfter > 360 || book.current + 1 >= book.chapters.length) return;
+    if (!settings.infiniteLoading ||
+        loadingNext ||
+        !scrollController.hasClients) {
+      return;
+    }
+    if (scrollController.position.extentAfter > 360 ||
+        book.current + 1 >= book.chapters.length) {
+      return;
+    }
     loadingNext = true;
     unawaited(widget.controller.loadChapter(book.current + 1).whenComplete(() {
       loadingNext = false;
-      if (mounted && scrollController.hasClients) scrollController.jumpTo(0);
+      if (mounted && scrollController.hasClients) {
+        scrollController.jumpTo(0);
+      }
     }));
   }
 
@@ -464,7 +479,9 @@ class _ReaderPageState extends State<ReaderPage> {
     if (renderedChapter != book.current) {
       renderedChapter = book.current;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !scrollController.hasClients) return;
+        if (!mounted || !scrollController.hasClients) {
+          return;
+        }
         scrollController.jumpTo(book.position.toDouble().clamp(0, scrollController.position.maxScrollExtent).toDouble());
       });
     }
@@ -550,7 +567,7 @@ class _ReaderPageState extends State<ReaderPage> {
       context: context,
       barrierLabel: '目录',
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(.18),
+      barrierColor: Colors.black.withValues(alpha: .18),
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (context, _, __) => Align(
         alignment: Alignment.centerLeft,
@@ -666,7 +683,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<int>(
-                value: value.font,
+                initialValue: value.font,
                 decoration: const InputDecoration(labelText: '正文字体'),
                 items: const [
                   DropdownMenuItem(value: 0, child: Text('宋体')),
@@ -774,7 +791,9 @@ class _FiltersDialogState extends State<FiltersDialog> {
                       tooltip: '删除规则',
                       onPressed: () async {
                         final updated = await widget.onDelete(rule.id);
-                        if (mounted && updated != null) setState(() => rules = updated.filters);
+                        if (mounted && updated != null) {
+                          setState(() => rules = updated.filters);
+                        }
                       },
                       icon: const Icon(Icons.delete_outline),
                     ),
