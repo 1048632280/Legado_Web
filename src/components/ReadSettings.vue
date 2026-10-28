@@ -32,6 +32,31 @@
       <div class="setting-row"><i>段距</i><div class="resize"><button @click="store.config.spacing.paragraph -= 0.1"><em class="iconfont">&#58966;</em></button><span>{{ store.config.spacing.paragraph.toFixed(1) }}</span><button @click="store.config.spacing.paragraph += 0.1"><em class="iconfont">&#58976;</em></button></div></div>
       <div v-if="!store.miniInterface" class="setting-row"><i>页面宽度</i><div class="resize"><button @click="lessReadWidth"><em class="iconfont">&#58965;</em></button><span>{{ store.config.readWidth }}</span><button @click="moreReadWidth"><em class="iconfont">&#58975;</em></button></div></div>
       <div class="setting-row"><i>翻页速度</i><div class="resize"><button @click="lessJumpDuration"><em class="iconfont">&#xe625;</em></button><span>{{ store.config.jumpDuration }}</span><button @click="moreJumpDuration"><em class="iconfont">&#xe626;</em></button></div></div>
+      <div class="setting-row auto-read-speed-row">
+        <label for="auto-read-speed">自动阅读速度</label>
+        <input
+          id="auto-read-speed"
+          class="speed-slider"
+          type="range"
+          min="5"
+          max="300"
+          step="1"
+          :value="store.config.autoReadSpeed"
+          :aria-valuetext="`${store.config.autoReadSpeed} 像素/秒`"
+          @input="updateAutoReadSpeedFromSlider"
+        />
+        <input
+          class="speed-number"
+          type="number"
+          min="5"
+          max="300"
+          step="1"
+          :value="store.config.autoReadSpeed"
+          aria-label="自动阅读速度，像素每秒"
+          @change="updateAutoReadSpeedFromInput"
+        />
+        <span class="speed-unit">px/s</span>
+      </div>
       <div class="setting-row">
         <i>无限加载</i>
         <div class="toggle-options">
@@ -86,6 +111,24 @@ const moreJumpDuration = () => {
 const lessJumpDuration = () => {
   if (store.config.jumpDuration > 0) store.config.jumpDuration -= 100
 }
+const AUTO_READ_SPEED_MIN = 5
+const AUTO_READ_SPEED_MAX = 300
+const clampAutoReadSpeed = (value: number) =>
+  Math.min(AUTO_READ_SPEED_MAX, Math.max(AUTO_READ_SPEED_MIN, Math.round(value)))
+const updateAutoReadSpeedFromSlider = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  store.config.autoReadSpeed = clampAutoReadSpeed(Number(input.value))
+}
+const updateAutoReadSpeedFromInput = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const value = Number(input.value)
+  if (!Number.isFinite(value) || input.value.trim() === '') {
+    input.value = String(store.config.autoReadSpeed)
+    return
+  }
+  store.config.autoReadSpeed = clampAutoReadSpeed(value)
+  input.value = String(store.config.autoReadSpeed)
+}
 </script>
 
 <style lang="scss" scoped>
@@ -115,6 +158,35 @@ const lessJumpDuration = () => {
   i {
     flex: 0 0 72px;
     font-style: normal;
+  }
+}
+
+.auto-read-speed-row {
+  flex-wrap: wrap;
+
+  label {
+    flex: 0 0 72px;
+  }
+
+  .speed-slider {
+    flex: 1 1 90px;
+    min-width: 72px;
+    accent-color: #ed4259;
+  }
+
+  .speed-number {
+    width: 62px;
+    min-height: 30px;
+    padding: 3px 5px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+  }
+
+  .speed-unit {
+    margin-left: -6px;
+    font-size: 12px;
   }
 }
 
