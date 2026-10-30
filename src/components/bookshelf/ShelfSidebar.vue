@@ -24,9 +24,12 @@
     </div>
     <div class="setting-wrapper">
       <div class="section-title">本地数据</div>
+      <div class="storage-description">{{ storageDescription }}</div>
       <div class="setting-item">
         <el-button size="small" @click="emit('importTxt')">导入 TXT</el-button>
-        <el-button type="danger" size="small" @click="emit('clearData')">清空数据</el-button>
+        <el-button type="danger" size="small" @click="emit('clearData')"
+          >清空数据</el-button
+        >
       </div>
     </div>
   </aside>
@@ -39,6 +42,7 @@ import type { ReadingRecentBook } from '@/utils/bookshelf'
 const props = defineProps<{
   searchWord: string
   readingRecent: ReadingRecentBook
+  storageDescription: string
 }>()
 
 const emit = defineEmits<{
@@ -97,6 +101,14 @@ const hasReadingRecent = computed(() => props.readingRecent.bookUrl !== '')
 
 .section-title {
   font-size: 14px;
+}
+
+.storage-description {
+  margin-top: 8px;
+  color: var(--shelf-soft-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .recent-book,

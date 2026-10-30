@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "identifier": "com.legado.localreader",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm desktop:frontend:dev",
     "devUrl": "http://127.0.0.1:8080",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm desktop:frontend:build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -30,15 +30,15 @@
     "active": true,
     "targets": ["nsis"],
     "icon": ["../public/favicon.ico"],
-      "windows": {
-        "nsis": {
-          "installMode": "perMachine",
-          "startMenuFolder": "Legado Web",
-          "template": "nsis/installer.nsi",
-          "installerHooks": "nsis/installer-hooks.nsh"
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "startMenuFolder": "Legado Web",
+        "template": "nsis/installer.nsi",
+        "installerHooks": "nsis/installer-hooks.nsh"
       },
       "webviewInstallMode": {
-        "type": "embedBootstrapper"
+        "type": "offlineInstaller"
       }
     }
   }

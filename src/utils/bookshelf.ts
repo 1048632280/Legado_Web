@@ -47,8 +47,7 @@ export const filterShelfBooks = (books: Book[], keyword: string) => {
   if (key.length === 0) return books
 
   return books.filter(book => {
-    const text =
-      `${book.name} ${book.author} ${book.kind ?? ''}`.toLocaleLowerCase()
+    const text = `${book.name} ${book.author}`.toLocaleLowerCase()
     return text.includes(key)
   })
 }

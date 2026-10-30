@@ -83,6 +83,84 @@
     </div>
     <div class="read-bar" :style="rightBarTheme">
       <div class="tools">
+        <el-popover
+          placement="left"
+          :width="276"
+          trigger="click"
+          :show-arrow="false"
+          v-model:visible="autoReadSettingsVisible"
+          popper-class="pop-auto-read"
+        >
+          <div
+            id="auto-read-settings"
+            class="auto-read-panel"
+            :style="autoReadPanelTheme"
+            @click.stop
+          >
+            <div class="auto-read-heading">
+              <span>自动阅读</span>
+              <span class="auto-read-status" aria-live="polite">
+                {{ isAutoReading ? '正在阅读' : '已暂停' }}
+              </span>
+            </div>
+            <div class="auto-read-speed-row">
+              <label for="auto-read-speed">滚动速度</label>
+              <el-input-number
+                id="auto-read-speed"
+                :model-value="autoReadSpeed"
+                :min="1"
+                :max="300"
+                :step="1"
+                :disabled="noPoint"
+                size="small"
+                controls-position="right"
+                aria-label="自动阅读速度，像素每秒"
+                @update:model-value="setAutoReadSpeed"
+              />
+            </div>
+            <el-slider
+              :model-value="autoReadSpeed"
+              :min="1"
+              :max="300"
+              :step="1"
+              :disabled="noPoint"
+              aria-label="自动阅读速度"
+              @update:model-value="setAutoReadSpeed"
+            />
+            <div class="auto-read-speed-range">
+              <span>1 px/s</span>
+              <span>300 px/s</span>
+            </div>
+            <el-button
+              class="auto-read-action"
+              type="primary"
+              :aria-pressed="isAutoReading"
+              @click.stop="toggleAutoRead"
+            >
+              <el-icon>
+                <VideoPause v-if="isAutoReading" />
+                <VideoPlay v-else />
+              </el-icon>
+              {{ isAutoReading ? '暂停阅读' : '开始阅读' }}
+            </el-button>
+          </div>
+          <template #reference>
+            <button
+              type="button"
+              class="tool-icon auto-read-trigger"
+              :disabled="noPoint"
+              :class="{ 'is-reading': isAutoReading }"
+              :aria-label="isAutoReading ? '自动阅读设置，正在运行' : '自动阅读设置'"
+              :aria-expanded="autoReadSettingsVisible"
+              aria-controls="auto-read-settings"
+              title="自动阅读设置"
+              @click.stop
+            >
+              <el-icon class="auto-read-icon"><Timer /></el-icon>
+              <span v-if="miniInterface" class="icon-text">自动</span>
+            </button>
+          </template>
+        </el-popover>
         <div
           class="tool-icon"
           :class="{ 'no-point': noPoint }"
@@ -136,15 +214,37 @@ import API from '@api'
 import ContentFilterPanel from '@/components/ContentFilterPanel.vue'
 import { useLoading } from '@/hooks/loading'
 import { useContentFilters } from '@/hooks/useContentFilters'
-import { useThrottleFn } from '@vueuse/shared'
+import { useDebounceFn, useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
 import { applyContentFilters } from '@/utils/contentFilter'
-import { Filter } from '@element-plus/icons-vue'
+import { Filter, Timer, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { useAutoRead } from '@/hooks/useAutoRead'
 
 const content = ref()
 // loading spinner
 const { isLoading, loadingWrapper } = useLoading(content, '正在获取信息')
 const store = useBookStore()
+const autoReadSettingsVisible = ref(false)
+const autoReadConfigReady = ref(false)
+const autoReadSpeed = computed(() => store.config.autoReadSpeed)
+const setAutoReadSpeed = (
+  value: number | number[] | null | undefined,
+) => {
+  const speed = Array.isArray(value) ? value[0] : value
+  if (typeof speed !== 'number' || !Number.isFinite(speed)) return
+  store.config.autoReadSpeed = Math.min(300, Math.max(1, Math.round(speed)))
+}
+const saveAutoReadSpeed = useDebounceFn(async () => {
+  try {
+    const result = await API.saveReadConfig(store.config)
+    if (!result.data.isSuccess) ElMessage.warning(result.data.errorMsg)
+  } catch {
+    ElMessage.warning('自动阅读速度保存失败')
+  }
+}, 500)
+watch(autoReadSpeed, () => {
+  if (autoReadConfigReady.value) void saveAutoReadSpeed()
+})
 
 const {
   catalog,
@@ -247,6 +347,10 @@ const fontSize = computed(() => {
 const bodyColor = computed(() => settings.themes[theme.value].body)
 const chapterColor = computed(() => settings.themes[theme.value].content)
 const popupColor = computed(() => settings.themes[theme.value].popup)
+const autoReadPanelTheme = computed(() => ({
+  background: popupColor.value,
+  color: isNight.value ? '#eee' : '#262626',
+}))
 
 const readWidth = computed(() => {
   if (!miniInterface.value) {
@@ -316,9 +420,11 @@ watch(
 const top = ref()
 const bottom = ref()
 const toTop = () => {
+  stopAutoRead()
   jump(top.value)
 }
 const toBottom = () => {
+  stopAutoRead()
   jump(bottom.value)
 }
 
@@ -339,12 +445,34 @@ const scheduleToShelf = () => {
 // 获取章节内容
 type ChapterRenderData = { index: number; rawContent: string; title: string }
 const chapterData = ref<ChapterRenderData[]>([])
+const {
+  isRunning: isAutoReading,
+  stop: stopAutoRead,
+  toggle: toggleAutoRead,
+} = useAutoRead(autoReadSpeed, () => {
+  const latestChapter = chapterData.value[chapterData.value.length - 1]
+  if (
+    infiniteLoading.value &&
+    latestChapter !== undefined &&
+    latestChapter.index < catalog.value.length - 1
+  ) {
+    if (!isLoading.value) loadMore()
+    return true
+  }
+  ElMessage.info(
+    infiniteLoading.value
+      ? '已读至最后一章'
+      : '已到本章末尾，自动阅读已停止',
+  )
+  return false
+})
 const renderedChapterData = computed(() =>
   chapterData.value.map(data => ({
     index: data.index,
-    content: applyContentFilters(data.rawContent, contentFilterRules.value).split(
-      /\n+/,
-    ),
+    content: applyContentFilters(
+      data.rawContent,
+      contentFilterRules.value,
+    ).split(/\n+/),
     title: data.title,
   })),
 )
@@ -398,11 +526,7 @@ const writeChapterData = (
   finishChapterRender()
   if (reloadChapter) toChapterPos(chapterPos)
 }
-const renderChapterError = (
-  index: number,
-  title: string,
-  message: string,
-) => {
+const renderChapterError = (index: number, title: string, message: string) => {
   const errorMessage = message || '获取章节内容失败'
   ElMessage({ message: errorMessage, type: 'error' })
   writeChapterData({ index, rawContent: errorMessage, title }, false, 0)
@@ -452,6 +576,7 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
   }
 
   if (reloadChapter) {
+    stopAutoRead()
     //展示进度条
     store.setShowContent(false)
     //强制滚回顶层
@@ -578,6 +703,7 @@ const handleKeyPress = (event: KeyboardEvent) => {
       toNextChapter()
       break
     case 'ArrowUp':
+      stopAutoRead()
       event.stopPropagation()
       event.preventDefault()
       if (document.documentElement.scrollTop === 0) {
@@ -591,6 +717,7 @@ const handleKeyPress = (event: KeyboardEvent) => {
       }
       break
     case 'ArrowDown':
+      stopAutoRead()
       event.stopPropagation()
       event.preventDefault()
       if (
@@ -619,7 +746,8 @@ const ignoreKeyPress = (event: KeyboardEvent) => {
 }
 
 onMounted(async () => {
-  await store.loadWebConfig()
+  await store.loadReadConfig()
+  autoReadConfigReady.value = true
   //获取书籍数据
   const bookUrl = sessionStorage.getItem('bookUrl') ?? ''
   const name = sessionStorage.getItem('bookName') ?? ''
@@ -650,7 +778,7 @@ onMounted(async () => {
     !disposed && store.readingBook.bookUrl === book.bookUrl
   loadingWrapper(
     store
-      .loadWebCatalog(book)
+      .loadBookCatalog(book)
       .then(chapters => {
         if (!isActiveOpen()) return
         if (chapters.length === 0) {
@@ -699,6 +827,7 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   readSettingsVisible.value = false
   popCataVisible.value = false
+  autoReadSettingsVisible.value = false
   scrollObserver?.disconnect()
   scrollObserver = null
   jump.cancel()
@@ -710,6 +839,7 @@ onUnmounted(() => {
 onBeforeRouteLeave((to, from, next) => {
   // 弹窗时停止响应按键翻页
   window.removeEventListener('keyup', handleKeyPress)
+  stopAutoRead()
   next()
 })
 </script>
@@ -727,6 +857,11 @@ onBeforeRouteLeave((to, from, next) => {
 :deep(.pop-filter) {
   margin-left: 68px;
   top: 0;
+}
+
+:deep(.pop-auto-read) {
+  padding: 0;
+  overflow: hidden;
 }
 
 .chapter-wrapper {
@@ -812,6 +947,82 @@ onBeforeRouteLeave((to, from, next) => {
     }
   }
 
+  .auto-read-trigger {
+    display: block;
+    padding-right: 0;
+    padding-left: 0;
+    background: transparent;
+    font: inherit;
+    line-height: 1;
+
+    &.tool-icon:focus-visible {
+      outline: 2px solid #ed4259;
+      outline-offset: 2px;
+    }
+
+    .auto-read-icon {
+      display: block;
+      width: 16px;
+      height: 16px;
+      font-size: 16px;
+      margin: 0 auto 6px;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+
+  .auto-read-panel {
+    box-sizing: border-box;
+    padding: 16px;
+
+    .auto-read-heading,
+    .auto-read-speed-row,
+    .auto-read-speed-range {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .auto-read-heading {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .auto-read-status,
+    .auto-read-speed-range {
+      font-size: 12px;
+      font-weight: 400;
+      opacity: 0.72;
+    }
+
+    .auto-read-speed-row {
+      gap: 12px;
+      margin-top: 18px;
+      font-size: 14px;
+    }
+
+    .el-slider {
+      margin: 8px 6px 0;
+    }
+
+    .auto-read-speed-range {
+      margin-top: -2px;
+    }
+
+    .auto-read-action {
+      width: 100%;
+      min-height: 38px;
+      margin-top: 16px;
+    }
+
+    :deep(.el-input-number) {
+      width: 112px;
+    }
+  }
+
   .chapter {
     font-family:
       'Microsoft YaHei', PingFangSC-Regular, HelveticaNeue-Light,
@@ -838,6 +1049,10 @@ onBeforeRouteLeave((to, from, next) => {
 }
 
 .day {
+  :deep(.tool-icon.auto-read-trigger.is-reading) {
+    color: #ed4259;
+  }
+
   :deep(.popup) {
     box-shadow:
       0 2px 4px rgba(0, 0, 0, 0.12),
@@ -861,6 +1076,10 @@ onBeforeRouteLeave((to, from, next) => {
 }
 
 .night {
+  :deep(.tool-icon.auto-read-trigger.is-reading) {
+    color: #ed4259;
+  }
+
   :deep(.popup) {
     box-shadow:
       0 2px 4px rgba(0, 0, 0, 0.48),
@@ -925,6 +1144,13 @@ onBeforeRouteLeave((to, from, next) => {
           }
         }
       }
+    }
+
+    .auto-read-trigger {
+      position: fixed;
+      right: 15px;
+      bottom: 55px;
+      z-index: 101;
     }
 
     .chapter {

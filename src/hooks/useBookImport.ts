@@ -1,5 +1,5 @@
-import API from '@api'
-import type { LocalTextFile } from '@/api/standalone'
+import API, { isDesktopBuild, storageDescription } from '@api'
+import type { LocalTextFile } from '@/api/localReader'
 import type { webReadConfig } from '@/web'
 import {
   clearReadingSession,
@@ -8,22 +8,21 @@ import {
   isTextFile,
 } from '@/utils/bookshelf'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { onMounted, onUnmounted, ref } from 'vue'
 
-type UseStandaloneBookImportOptions = {
+type UseBookImportOptions = {
   loadingWrapper: (promise: Promise<unknown>) => Promise<unknown>
   reloadShelf: () => Promise<unknown>
   setReadConfig: (config?: webReadConfig) => void
   resetReadingRecent: () => void
 }
 
-export const useStandaloneBookImport = ({
+export const useBookImport = ({
   loadingWrapper,
   reloadShelf,
   setReadConfig,
   resetReadingRecent,
-}: UseStandaloneBookImportOptions) => {
+}: UseBookImportOptions) => {
   const fileInput = ref<HTMLInputElement>()
   const isDraggingFile = ref(false)
   const dragDepth = ref(0)
@@ -127,7 +126,9 @@ export const useStandaloneBookImport = ({
   }
 
   const setupNativeDrag = async () => {
+    if (!isDesktopBuild) return
     try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
       stopNativeDrag = await getCurrentWindow().onDragDropEvent(event => {
         const payload = event.payload
         if (payload.type === 'enter') {
@@ -167,10 +168,12 @@ export const useStandaloneBookImport = ({
     stopNativeDrag?.()
   })
 
-  const clearStandaloneData = async () => {
+  const clearLocalData = async () => {
     try {
       await ElMessageBox.confirm(
-        '此操作会删除 data 文件夹中的书籍、章节、进度和阅读设置。确定继续？',
+        '此操作会删除书籍、章节、进度和阅读设置（存储位置：' +
+          storageDescription +
+          '）。确定继续？',
         '清空数据',
         {
           confirmButtonText: '清空',
@@ -183,7 +186,7 @@ export const useStandaloneBookImport = ({
     }
 
     try {
-      const result = await API.clearStandaloneData()
+      const result = await API.clearLocalData()
       if (!result.data.isSuccess) {
         ElMessage.error(result.data.errorMsg)
         return
@@ -208,6 +211,6 @@ export const useStandaloneBookImport = ({
     handleShelfDragOver,
     handleShelfDragLeave,
     handleShelfDrop,
-    clearStandaloneData,
+    clearLocalData,
   }
 }

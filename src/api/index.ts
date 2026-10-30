@@ -1,4 +1,7 @@
-import API from './api'
+import browserApi, { storageDescription } from './browserStorage'
 
-export default API
+export const isDesktopBuild = false
+
+export { storageDescription }
+export default browserApi
 export * from './api'

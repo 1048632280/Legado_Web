@@ -3,6 +3,7 @@
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -27,6 +28,49 @@ fn app_directory() -> Result<PathBuf, String> {
         .parent()
         .map(Path::to_path_buf)
         .ok_or_else(|| "获取程序目录失败".to_string())
+}
+
+fn merge_webview_cab_parts(directory: &Path) -> Result<(), String> {
+    let mut parts = fs::read_dir(directory)
+        .map_err(|error| format!("读取 WebView2 分片目录失败：{error}"))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("webview2-fixed.") && name.ends_with(".part"))
+        })
+        .collect::<Vec<_>>();
+    parts.sort();
+    if parts.is_empty() {
+        return Err("未找到 WebView2 CAB 分片".to_string());
+    }
+
+    let cab_path = directory.join("webview2-fixed.cab");
+    let mut output =
+        fs::File::create(&cab_path).map_err(|error| format!("创建 WebView2 CAB 失败：{error}"))?;
+    for part in parts {
+        let mut input = fs::File::open(&part)
+            .map_err(|error| format!("读取 WebView2 分片失败：{}：{error}", part.display()))?;
+        io::copy(&mut input, &mut output)
+            .map_err(|error| format!("合并 WebView2 CAB 分片失败：{error}"))?;
+    }
+    Ok(())
+}
+
+fn handle_packaging_command() -> Result<bool, String> {
+    let mut arguments = std::env::args().skip(1);
+    let Some(command) = arguments.next() else {
+        return Ok(false);
+    };
+    if command != "--merge-webview-cab" {
+        return Ok(false);
+    }
+    let directory = arguments
+        .next()
+        .ok_or_else(|| "缺少 WebView2 CAB 分片目录".to_string())?;
+    merge_webview_cab_parts(Path::new(&directory))?;
+    Ok(true)
 }
 
 fn ensure_data_directory() -> Result<PathBuf, String> {
@@ -94,11 +138,6 @@ fn collect_text_paths(path: &Path, paths: &mut Vec<PathBuf>) -> Result<(), Strin
         collect_text_paths(&entry.path(), paths)?;
     }
     Ok(())
-}
-
-#[tauri::command]
-fn get_local_data_directory() -> Result<String, String> {
-    ensure_data_directory().map(|path| path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -271,9 +310,16 @@ fn clear_local_data() -> Result<(), String> {
 }
 
 fn main() {
+    match handle_packaging_command() {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+    }
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            get_local_data_directory,
             read_local_text_files,
             list_local_books,
             read_local_book,

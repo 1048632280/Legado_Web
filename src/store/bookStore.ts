@@ -1,11 +1,6 @@
 import { defineStore } from 'pinia'
 import API from '@api'
-import type {
-  BaseBook,
-  Book,
-  BookChapter,
-  BookProgress,
-} from '@/book'
+import type { BaseBook, Book, BookChapter, BookProgress } from '@/book'
 import type { webReadConfig } from '@/web'
 import {
   createDefaultReadConfig,
@@ -99,7 +94,7 @@ export const useBookStore = defineStore('book', {
       return this.refreshBookShelf()
     },
     /** 从本地数据源加载书籍目录，优先返回内存缓存 */
-    async loadWebCatalog(
+    async loadBookCatalog(
       book: typeof this.readingBook,
     ): Promise<BookChapter[]> {
       const { bookUrl, name, chapterIndex } = book
@@ -154,8 +149,8 @@ export const useBookStore = defineStore('book', {
     setReadingBook(readingBook: typeof this.readingBook) {
       this.readingBook = readingBook
     },
-    /** 只加载一次 Web 阅读配置 */
-    async loadWebConfig() {
+    /** 只加载一次阅读配置 */
+    async loadReadConfig() {
       if (!webReadConfigLoaded) {
         const config = await API.getReadConfig()
         webReadConfigLoaded = true
@@ -174,7 +169,7 @@ export const useBookStore = defineStore('book', {
     setMiniInterface(mini: boolean) {
       this.miniInterface = mini
     },
-    /** 1.保存进度到浏览器本地 2.修改内存中的数据 */
+    /** 保存进度到本地并更新内存中的数据 */
     async saveBookProgress() {
       const progress = this.bookProgress
       if (progress === undefined) return
@@ -185,7 +180,7 @@ export const useBookStore = defineStore('book', {
       if (findIndex > -1) {
         this.shelf[findIndex] = { ...shelfRaw[findIndex], ...progress }
       }
-      return API.saveBookProgressWithBeacon(progress)
+      return API.saveBookProgress(progress)
     },
   },
 })

@@ -3,9 +3,10 @@
     <shelf-sidebar
       v-model:search-word="searchWord"
       :reading-recent="readingRecent"
+      :storage-description="storageDescription"
       @recent-click="openReadingRecent"
       @import-txt="fileInput?.click()"
-      @clear-data="clearStandaloneData"
+      @clear-data="clearLocalData"
     />
     <input
       ref="fileInput"
@@ -24,7 +25,10 @@
       @dragleave="handleShelfDragLeave"
       @drop="handleShelfDrop"
     >
-      <shelf-empty-state v-if="showEmptyState" @import-txt="fileInput?.click()" />
+      <shelf-empty-state
+        v-if="showEmptyState"
+        @import-txt="fileInput?.click()"
+      />
       <div v-else-if="showSearchEmptyState" class="shelf-empty-message">
         本地书架没有匹配「{{ searchWord.trim() }}」的书籍。
       </div>
@@ -47,7 +51,7 @@ import ShelfEmptyState from '@/components/bookshelf/ShelfEmptyState.vue'
 import ShelfSidebar from '@/components/bookshelf/ShelfSidebar.vue'
 import { useBookStore } from '@/store'
 import { useLoading } from '@/hooks/loading'
-import { useStandaloneBookImport } from '@/hooks/useStandaloneBookImport'
+import { useBookImport } from '@/hooks/useBookImport'
 import type { Book } from '@/book'
 import {
   type ReadingRecentBook,
@@ -59,7 +63,7 @@ import {
   hasBookOnShelf,
   saveReadingSession,
 } from '@/utils/bookshelf'
-import API from '@api'
+import API, { storageDescription } from '@api'
 
 const store = useBookStore()
 const router = useRouter()
@@ -68,14 +72,19 @@ const shelf = computed(() => store.shelf)
 const searchWord = ref('')
 const readingRecent = ref<ReadingRecentBook>(createDefaultReadingRecent())
 const shelfWrapper = ref<HTMLElement>()
-const { loadingWrapper, isLoading } = useLoading(shelfWrapper, '正在读取本地书架')
+const { loadingWrapper, isLoading } = useLoading(
+  shelfWrapper,
+  '正在读取本地书架',
+)
 
 const books = computed(() =>
   searchWord.value.trim() === ''
     ? shelf.value
     : filterShelfBooks(shelf.value, searchWord.value),
 )
-const showEmptyState = computed(() => !isLoading.value && shelf.value.length === 0)
+const showEmptyState = computed(
+  () => !isLoading.value && shelf.value.length === 0,
+)
 const showSearchEmptyState = computed(
   () => searchWord.value.trim() !== '' && books.value.length === 0,
 )
@@ -93,8 +102,8 @@ const {
   handleShelfDragOver,
   handleShelfDragLeave,
   handleShelfDrop,
-  clearStandaloneData,
-} = useStandaloneBookImport({
+  clearLocalData,
+} = useBookImport({
   loadingWrapper,
   reloadShelf: () => store.loadBookShelf(true),
   setReadConfig: config => store.setConfig(config),
@@ -103,11 +112,15 @@ const {
 
 const handleBookDelete = async (book: Book) => {
   try {
-    await ElMessageBox.confirm(`确定从本地书架删除《${book.name}》？`, '删除书籍', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      `确定从本地书架删除《${book.name}》？`,
+      '删除书籍',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
     const result = await API.deleteBook(book)
     if (!result.data.isSuccess) {
       ElMessage.error(result.data.errorMsg)
@@ -140,7 +153,13 @@ const toDetail = (
     clearReadingSession()
     return
   }
-  const recent: ReadingRecentBook = { name, author, bookUrl, chapterIndex, chapterPos }
+  const recent: ReadingRecentBook = {
+    name,
+    author,
+    bookUrl,
+    chapterIndex,
+    chapterPos,
+  }
   readingRecent.value = recent
   void API.saveReadingRecent(recent)
   saveReadingSession(recent)
@@ -169,7 +188,7 @@ onMounted(() => {
     if (recent !== null) readingRecent.value = recent
   })
   void loadingWrapper(
-    store.loadWebConfig().then(() => store.loadBookShelf(true)),
+    store.loadReadConfig().then(() => store.loadBookShelf(true)),
   ).catch(error => ElMessage.error(`加载书架失败：${getErrorMessage(error)}`))
 })
 </script>
