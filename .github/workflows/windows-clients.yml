@@ -40,7 +40,11 @@ jobs:
         shell: pwsh
         run: |
           choco install nsis --yes --no-progress
-          Get-Command makensis.exe -ErrorAction Stop | Out-Null
+          $nsisPath = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
+          if (-not (Test-Path (Join-Path $nsisPath 'makensis.exe'))) {
+            throw "NSIS compiler not found in $nsisPath"
+          }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $nsisPath
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
