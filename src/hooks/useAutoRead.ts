@@ -8,12 +8,11 @@ export const useAutoRead = (
   let animationFrameId: number | undefined
   let boundaryPollId: number | undefined
   let previousFrameTime: number | undefined
+  let targetPosition = 0
   let stalledFrames = 0
 
-  const stop = () => {
-    isRunning.value = false
+  const clearScheduledWork = () => {
     previousFrameTime = undefined
-    stalledFrames = 0
     if (animationFrameId !== undefined) {
       cancelAnimationFrame(animationFrameId)
       animationFrameId = undefined
@@ -24,27 +23,49 @@ export const useAutoRead = (
     }
   }
 
+  const stop = () => {
+    isRunning.value = false
+    stalledFrames = 0
+    clearScheduledWork()
+  }
+
+  const scheduleFrame = () => {
+    if (!isRunning.value || document.visibilityState === 'hidden') return
+    if (animationFrameId === undefined) {
+      animationFrameId = requestAnimationFrame(scrollFrame)
+    }
+  }
+
   const scrollFrame = (timestamp: number) => {
+    animationFrameId = undefined
     if (!isRunning.value) return
+    if (document.visibilityState === 'hidden') {
+      previousFrameTime = undefined
+      return
+    }
 
     if (previousFrameTime === undefined) {
       previousFrameTime = timestamp
-      animationFrameId = requestAnimationFrame(scrollFrame)
+      scheduleFrame()
       return
     }
 
-    const elapsed = timestamp - previousFrameTime
+    const elapsed = Math.min(timestamp - previousFrameTime, 50)
     previousFrameTime = timestamp
-    if (elapsed > 100) {
-      animationFrameId = requestAnimationFrame(scrollFrame)
-      return
-    }
-
     const currentPosition = window.scrollY
-    const pixelsToScroll = (speed.value * Math.min(elapsed, 50)) / 1000
-    window.scrollBy(0, pixelsToScroll)
+    if (Math.abs(currentPosition - targetPosition) > 2) {
+      targetPosition = currentPosition
+    }
+    targetPosition += (speed.value * elapsed) / 1000
+    window.scrollTo({ left: 0, top: targetPosition, behavior: 'instant' })
 
-    if (window.scrollY <= currentPosition + 0.001) {
+    const documentElement = document.documentElement
+    const maxScrollPosition = Math.max(
+      0,
+      documentElement.scrollHeight - documentElement.clientHeight,
+    )
+    const isAtBottom = currentPosition >= maxScrollPosition - 1
+    if (isAtBottom && window.scrollY <= currentPosition + 0.001) {
       stalledFrames += 1
       if (stalledFrames >= 2) {
         if (!onScrollEnd()) {
@@ -52,12 +73,11 @@ export const useAutoRead = (
           return
         }
         stalledFrames = 0
-        animationFrameId = undefined
         boundaryPollId = window.setTimeout(() => {
           boundaryPollId = undefined
-          if (isRunning.value) {
-            animationFrameId = requestAnimationFrame(scrollFrame)
-          }
+          targetPosition = window.scrollY
+          previousFrameTime = undefined
+          scheduleFrame()
         }, 100)
         return
       }
@@ -65,15 +85,15 @@ export const useAutoRead = (
       stalledFrames = 0
     }
 
-    animationFrameId = requestAnimationFrame(scrollFrame)
+    scheduleFrame()
   }
 
   const start = () => {
     if (isRunning.value) return
     isRunning.value = true
-    previousFrameTime = undefined
+    targetPosition = window.scrollY
     stalledFrames = 0
-    animationFrameId = requestAnimationFrame(scrollFrame)
+    scheduleFrame()
   }
 
   const toggle = () => {
@@ -81,7 +101,20 @@ export const useAutoRead = (
     else start()
   }
 
-  onScopeDispose(stop)
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      clearScheduledWork()
+      return
+    }
+    targetPosition = window.scrollY
+    scheduleFrame()
+  }
+
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  onScopeDispose(() => {
+    stop()
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+  })
 
   return { isRunning, start, stop, toggle }
 }

@@ -68,7 +68,7 @@ export const normalizeReadConfig = (value: unknown): webReadConfig => {
   const jumpDuration = integerInRange(value.jumpDuration, 0, 10000)
   if (jumpDuration !== undefined) config.jumpDuration = jumpDuration
 
-  const autoReadSpeed = integerInRange(value.autoReadSpeed, 1, 300)
+  const autoReadSpeed = integerInRange(value.autoReadSpeed, 1, 600)
   if (autoReadSpeed !== undefined) config.autoReadSpeed = autoReadSpeed
 
   if (typeof value.infiniteLoading === 'boolean') {

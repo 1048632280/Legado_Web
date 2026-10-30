@@ -1,0 +1,85 @@
+name: Build Windows Clients
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'next/**'
+      - '.github/workflows/next.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-clients:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> src-tauri/target
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          Get-Command makensis.exe -ErrorAction Stop | Out-Null
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all four packages
+        run: pnpm desktop:build:all
+
+      - name: Upload online installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado-web-online-installer
+          path: src-tauri/target/release/packages/online-installer/Legado-Web-Online-Setup.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload offline installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado-web-offline-installer
+          path: src-tauri/target/release/packages/offline-installer/Legado-Web-Offline-Setup.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado-web-portable
+          path: src-tauri/target/release/packages/portable/Legado-Web-Portable.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload offline portable single-file package
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado-web-portable-offline
+          path: src-tauri/target/release/packages/portable-offline/Legado-Web-Portable-Offline.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30

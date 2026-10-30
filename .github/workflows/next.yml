@@ -1,0 +1,99 @@
+name: Legado Next
+
+on:
+  push:
+    paths: ["next/**", ".github/workflows/next.yml"]
+  pull_request:
+    paths: ["next/**", ".github/workflows/next.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-core:
+    name: Rust core checks
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: next
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: next
+      - run: cargo fmt --all
+      - run: cargo fmt --all -- --check
+      - run: cargo test --all-targets
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rustfmt-output
+          path: next/src/lib.rs
+
+  flutter:
+    name: Flutter analyze and test
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: next/flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Flutter host metadata
+        working-directory: next
+        run: |
+          flutter create --platforms=windows --project-name legado_next _flutter_host
+          cp -R _flutter_host/windows flutter/windows
+          rm -rf _flutter_host
+      - run: flutter pub get
+      - run: dart format lib
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dartfmt-output
+          path: next/flutter/lib/
+      - run: flutter analyze
+      - run: flutter test
+
+  build-windows:
+    name: Build Windows desktop
+    needs: [rust-core, flutter]
+    runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: next
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Flutter Windows host
+        shell: pwsh
+        run: |
+          flutter create --platforms=windows --project-name legado_next _flutter_host
+          Copy-Item -Recurse -Force _flutter_host/windows flutter/windows
+          Remove-Item -Recurse -Force _flutter_host
+      - name: Build Rust core
+        run: cargo build --release --target x86_64-pc-windows-msvc
+      - name: Build Flutter app
+        working-directory: next/flutter
+        run: |
+          flutter pub get
+          flutter build windows --release
+      - name: Bundle Rust core
+        shell: pwsh
+        run: Copy-Item target/x86_64-pc-windows-msvc/release/legado_core.dll flutter/build/windows/x64/runner/Release/legado_core.dll
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legado-next-windows-x64
+          path: next/flutter/build/windows/x64/runner/Release/

@@ -109,7 +109,7 @@
                 id="auto-read-speed"
                 :model-value="autoReadSpeed"
                 :min="1"
-                :max="300"
+                :max="600"
                 :step="1"
                 :disabled="noPoint"
                 size="small"
@@ -121,7 +121,7 @@
             <el-slider
               :model-value="autoReadSpeed"
               :min="1"
-              :max="300"
+              :max="600"
               :step="1"
               :disabled="noPoint"
               aria-label="自动阅读速度"
@@ -129,7 +129,7 @@
             />
             <div class="auto-read-speed-range">
               <span>1 px/s</span>
-              <span>300 px/s</span>
+              <span>600 px/s</span>
             </div>
             <el-button
               class="auto-read-action"
@@ -232,7 +232,7 @@ const setAutoReadSpeed = (
 ) => {
   const speed = Array.isArray(value) ? value[0] : value
   if (typeof speed !== 'number' || !Number.isFinite(speed)) return
-  store.config.autoReadSpeed = Math.min(300, Math.max(1, Math.round(speed)))
+  store.config.autoReadSpeed = Math.min(600, Math.max(1, Math.round(speed)))
 }
 const saveAutoReadSpeed = useDebounceFn(async () => {
   try {
@@ -318,6 +318,7 @@ watchEffect(() => {
   }
 })
 const loadMore = () => {
+  if (isLoading.value) return
   const latestChapter = chapterData.value[chapterData.value.length - 1]
   if (latestChapter === undefined) return
   const index = latestChapter.index
@@ -825,6 +826,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   // 兼容Safari < 14
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  stopAutoRead()
   readSettingsVisible.value = false
   popCataVisible.value = false
   autoReadSettingsVisible.value = false
@@ -942,6 +944,14 @@ onBeforeRouteLeave((to, from, next) => {
           height: 16px;
           font-size: 16px;
           margin: 0 auto 6px;
+        }
+
+        .auto-read-icon {
+          display: block;
+          width: 16px;
+          height: 16px;
+          margin: 0 auto 6px;
+          font-size: 16px;
         }
       }
     }
@@ -1143,6 +1153,7 @@ onBeforeRouteLeave((to, from, next) => {
             display: inline-block;
           }
         }
+
       }
     }
 
