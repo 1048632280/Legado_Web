@@ -84,7 +84,7 @@
     <div class="read-bar" :style="rightBarTheme">
       <div class="tools">
         <el-popover
-          placement="left"
+          placement="left-end"
           :width="276"
           trigger="click"
           :show-arrow="false"
@@ -94,55 +94,57 @@
           <div
             id="auto-read-settings"
             class="auto-read-panel"
+            :class="{ night: isNight, day: !isNight }"
             :style="autoReadPanelTheme"
             @click.stop
           >
-            <div class="auto-read-heading">
-              <span>自动阅读</span>
-              <span class="auto-read-status" aria-live="polite">
-                {{ isAutoReading ? '正在阅读' : '已暂停' }}
-              </span>
-            </div>
             <div class="auto-read-speed-row">
-              <label for="auto-read-speed">滚动速度</label>
-              <el-input-number
-                id="auto-read-speed"
-                :model-value="autoReadSpeed"
-                :min="1"
-                :max="600"
-                :step="1"
-                :disabled="noPoint"
-                size="small"
-                controls-position="right"
-                aria-label="自动阅读速度，像素每秒"
-                @update:model-value="setAutoReadSpeed"
-              />
+              <label for="auto-read-speed-number">滚动速度</label>
+              <div class="auto-read-speed-value">
+                <input
+                  id="auto-read-speed-number"
+                  class="auto-read-speed-number"
+                  type="number"
+                  min="1"
+                  max="600"
+                  step="1"
+                  :value="autoReadSpeed"
+                  :disabled="noPoint"
+                  aria-label="自动阅读速度，像素每秒"
+                  @change="updateAutoReadSpeedFromInput"
+                />
+                <span>px/s</span>
+              </div>
             </div>
-            <el-slider
-              :model-value="autoReadSpeed"
+            <input
+              id="auto-read-speed-range"
+              class="auto-read-speed-slider"
+              type="range"
               :min="1"
               :max="600"
               :step="1"
+              :value="autoReadSpeed"
               :disabled="noPoint"
-              aria-label="自动阅读速度"
-              @update:model-value="setAutoReadSpeed"
+              aria-label="滚动速度滑块"
+              :aria-valuetext="`${autoReadSpeed} 像素/秒`"
+              @input="updateAutoReadSpeedFromSlider"
             />
             <div class="auto-read-speed-range">
               <span>1 px/s</span>
               <span>600 px/s</span>
             </div>
-            <el-button
+            <button
+              type="button"
               class="auto-read-action"
-              type="primary"
               :aria-pressed="isAutoReading"
               @click.stop="toggleAutoRead"
             >
-              <el-icon>
+              <el-icon aria-hidden="true">
                 <VideoPause v-if="isAutoReading" />
                 <VideoPlay v-else />
               </el-icon>
               {{ isAutoReading ? '暂停阅读' : '开始阅读' }}
-            </el-button>
+            </button>
           </div>
           <template #reference>
             <button
@@ -233,6 +235,20 @@ const setAutoReadSpeed = (
   const speed = Array.isArray(value) ? value[0] : value
   if (typeof speed !== 'number' || !Number.isFinite(speed)) return
   store.config.autoReadSpeed = Math.min(600, Math.max(1, Math.round(speed)))
+}
+const updateAutoReadSpeedFromSlider = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  setAutoReadSpeed(Number(input.value))
+}
+const updateAutoReadSpeedFromInput = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const value = Number(input.value)
+  if (!Number.isFinite(value) || input.value.trim() === '') {
+    input.value = String(autoReadSpeed.value)
+    return
+  }
+  setAutoReadSpeed(value)
+  input.value = String(autoReadSpeed.value)
 }
 const saveAutoReadSpeed = useDebounceFn(async () => {
   try {
@@ -351,6 +367,7 @@ const popupColor = computed(() => settings.themes[theme.value].popup)
 const autoReadPanelTheme = computed(() => ({
   background: popupColor.value,
   color: isNight.value ? '#eee' : '#262626',
+  colorScheme: isNight.value ? 'dark' : 'light',
 }))
 
 const readWidth = computed(() => {
@@ -861,9 +878,122 @@ onBeforeRouteLeave((to, from, next) => {
   top: 0;
 }
 
-:deep(.pop-auto-read) {
+:global(.pop-auto-read) {
   padding: 0;
   overflow: hidden;
+}
+
+:global(.pop-auto-read .auto-read-panel) {
+  box-sizing: border-box;
+  padding: 16px 18px 18px;
+  color: inherit;
+}
+
+:global(.pop-auto-read .auto-read-speed-row) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+
+:global(.pop-auto-read .auto-read-speed-value) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+:global(.pop-auto-read .auto-read-speed-number) {
+  box-sizing: border-box;
+  width: 68px;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+:global(.pop-auto-read .auto-read-speed-number:focus-visible) {
+  border-color: #ed4259;
+  outline: 2px solid rgba(237, 66, 89, 0.3);
+  outline-offset: 1px;
+}
+
+:global(.pop-auto-read .auto-read-panel.night .auto-read-speed-number) {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+:global(.pop-auto-read .auto-read-speed-slider) {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 24px;
+  margin: 9px 0 0;
+  accent-color: #ed4259;
+  cursor: pointer;
+}
+
+:global(.pop-auto-read .auto-read-speed-slider:focus-visible) {
+  outline: 2px solid rgba(237, 66, 89, 0.35);
+  outline-offset: 2px;
+}
+
+:global(.pop-auto-read .auto-read-speed-slider:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+:global(.pop-auto-read .auto-read-speed-range) {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  padding: 0 2px;
+  color: inherit;
+  font-size: 12px;
+  opacity: 0.68;
+}
+
+:global(.pop-auto-read .auto-read-action) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid #ed4259;
+  border-radius: 3px;
+  background: rgba(237, 66, 89, 0.06);
+  color: #ed4259;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+:global(.pop-auto-read .auto-read-action:hover),
+:global(.pop-auto-read .auto-read-action:focus-visible) {
+  border-color: #ed4259;
+  background: rgba(237, 66, 89, 0.1);
+  color: #ed4259;
+}
+
+:global(.pop-auto-read .auto-read-action:focus-visible) {
+  outline: 2px solid rgba(237, 66, 89, 0.35);
+  outline-offset: 2px;
+}
+
+:global(.pop-auto-read .auto-read-action:active) {
+  background: rgba(237, 66, 89, 0.16);
 }
 
 .chapter-wrapper {
@@ -928,15 +1058,26 @@ onBeforeRouteLeave((to, from, next) => {
       flex-direction: column;
 
       .tool-icon {
+        display: flex;
+        box-sizing: content-box;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         font-size: 18px;
         width: 42px;
-        height: 31px;
-        padding-top: 12px;
+        height: 43px;
+        padding: 0;
         text-align: center;
         align-items: center;
         cursor: pointer;
         outline: none;
         margin-top: -1px;
+
+        > .iconfont,
+        > .auto-read-icon {
+          flex: 0 0 16px;
+          margin: 0;
+        }
 
         .iconfont {
           font-family: iconfont;
@@ -947,10 +1088,13 @@ onBeforeRouteLeave((to, from, next) => {
         }
 
         .auto-read-icon {
-          display: block;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 16px;
           width: 16px;
           height: 16px;
-          margin: 0 auto 6px;
+          margin: 0;
           font-size: 16px;
         }
       }
@@ -958,7 +1102,11 @@ onBeforeRouteLeave((to, from, next) => {
   }
 
   .auto-read-trigger {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    appearance: none;
+    box-sizing: content-box;
     padding-right: 0;
     padding-left: 0;
     background: transparent;
@@ -971,65 +1119,18 @@ onBeforeRouteLeave((to, from, next) => {
     }
 
     .auto-read-icon {
-      display: block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       width: 16px;
       height: 16px;
       font-size: 16px;
-      margin: 0 auto 6px;
+      margin: 0;
     }
 
     &:disabled {
       cursor: not-allowed;
       opacity: 0.5;
-    }
-  }
-
-  .auto-read-panel {
-    box-sizing: border-box;
-    padding: 16px;
-
-    .auto-read-heading,
-    .auto-read-speed-row,
-    .auto-read-speed-range {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .auto-read-heading {
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    .auto-read-status,
-    .auto-read-speed-range {
-      font-size: 12px;
-      font-weight: 400;
-      opacity: 0.72;
-    }
-
-    .auto-read-speed-row {
-      gap: 12px;
-      margin-top: 18px;
-      font-size: 14px;
-    }
-
-    .el-slider {
-      margin: 8px 6px 0;
-    }
-
-    .auto-read-speed-range {
-      margin-top: -2px;
-    }
-
-    .auto-read-action {
-      width: 100%;
-      min-height: 38px;
-      margin-top: 16px;
-    }
-
-    :deep(.el-input-number) {
-      width: 112px;
     }
   }
 
